@@ -5,13 +5,12 @@ import numpy as np
 def preparer_image(image_originale, total_dominos):
     """
     Convertit l'image en noir et blanc(niveau de gris) et la redimensionne 
-    en utilisant les diviseurs parfaits pour vider 100% du stock. et bien respecter la proportion des jeux des dominos
+    en utilisant les diviseurs parfaits pour vider 100% du stock.
     """
-    image_nb = image_originale.convert("L") # conversion en NB
-
+    image_nb = image_originale.convert("L") 
     image_nb = ImageOps.autocontrast(image_nb)
     
-    surface_cible = total_dominos * 2  # nb pixels = 2* nb_dominos
+    surface_cible = total_dominos * 2  
     
     largeur_orig, hauteur_orig = image_nb.size
     ratio_cible = largeur_orig / hauteur_orig
@@ -38,26 +37,25 @@ def image_vers_matrice(image_pil, type_jeu="double_six"):
     """Convertit l'image (0-255) en une matrice de dominos (0-6 ou 0-9)."""
     valeur_max = 6 if type_jeu == "double_six" else 9
     matrice_pixels = np.array(image_pil) 
-    
-    # 1. Mise à l'échelle classique
     matrice_dominos = matrice_pixels / 255.0 
     matrice_dominos = matrice_dominos * valeur_max
     matrice_dominos = np.round(matrice_dominos).astype(int)
     
-    # --- LA LIGNE MAGIQUE POUR CORRIGER L'EFFET NÉGATIF ---
-    # Un pixel noir (0) deviendra la valeur max (6 ou 9, donc plein de points noirs)
-    # Un pixel blanc (max) deviendra un 0 (aucun point noir, donc domino tout blanc)
+    # --- CORRECTION DE L'EFFET NÉGATIF ---
+    # Pour des dominos blancs à points noirs, un pixel noir sur la photo
+    # doit correspondre au domino avec le plus de points noirs (le 6 ou le 9).
     matrice_dominos = valeur_max - matrice_dominos
     
     return matrice_dominos
 
 def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
-    """Crée l'image finale en dessinant les dominos un par un avec un fond blanc."""
+    """Crée l'image finale avec des dominos blancs séparés visuellement."""
     largeur_img = colonnes * taille_case
     hauteur_img = lignes * taille_case
     
-    # 1. On crée une image de fond blanche (au lieu de noire)
-    image_finale = Image.new("RGB", (largeur_img, hauteur_img), "white")
+    # Fond global de l'image (Gris très foncé pour faire ressortir les dominos blancs)
+    couleur_fond = (40, 40, 40)
+    image_finale = Image.new("RGB", (largeur_img, hauteur_img), couleur_fond)
     dessin = ImageDraw.Draw(image_finale)
 
     def dessiner_points(x, y, valeur):
@@ -86,8 +84,12 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
 
         for p in pts:
             px, py = pos[p]
-            # 2. Les points (pips) deviennent noirs (au lieu de blancs)
+            # Les points (pips) sont noirs
             dessin.ellipse([px-r, py-r, px+r, py+r], fill="black")
+
+    # Calcul de l'espacement et de l'arrondi
+    padding = max(1, taille_case // 15) # Espace entre les dominos
+    rayon_arrondi = taille_case // 5    # Pour les coins doux
 
     for p in placements:
         i1, j1 = p["case1"]
@@ -100,25 +102,27 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
         x_min, y_min = min(x1, x2), min(y1, y2)
         x_max, y_max = max(x1, x2) + taille_case, max(y1, y2) + taille_case
 
-        # 3. Le corps du domino devient blanc cassé avec une bordure noire/grise
-        dessin.rectangle(
-            [x_min, y_min, x_max, y_max], 
-            fill=(245, 245, 245), # Un blanc très légèrement cassé pour le volume
-            outline="black", 
-            width=2
-        )
-        
-        # 4. La ligne de séparation au milieu du domino devient noire
-        if i1 == i2: # Domino horizontal
-            dessin.line([x2, y_min, x2, y_max], fill="black", width=2)
-        else: # Domino vertical
-            dessin.line([x_min, y2, x_max, y2], fill="black", width=2)
+        # Coordonnées du domino AVEC l'espacement (padding)
+        x1_pad = x_min + padding
+        y1_pad = y_min + padding
+        x2_pad = x_max - padding
+        y2_pad = y_max - padding
 
+        # On dessine le domino blanc avec des coins arrondis
+        try:
+            dessin.rounded_rectangle([x1_pad, y1_pad, x2_pad, y2_pad], radius=rayon_arrondi, fill="white", outline="black", width=2)
+        except AttributeError:
+            # Sécurité si une très vieille version de Pillow est installée
+            dessin.rectangle([x1_pad, y1_pad, x2_pad, y2_pad], fill="white", outline="black", width=2)
+        
+        # La ligne de séparation au milieu (plus fine que la bordure globale)
+        if i1 == i2: # Domino horizontal
+            dessin.line([x2, y1_pad, x2, y2_pad], fill="black", width=2)
+        else: # Domino vertical
+            dessin.line([x1_pad, y2, x2_pad, y2], fill="black", width=2)
+
+        # On dessine les points par-dessus
         dessiner_points(x1, y1, v1)
         dessiner_points(x2, y2, v2)
 
     return image_finale
-
-if __name__ == "__main__":
-    print("Fichier traitement_image.py prêt.")
-    
