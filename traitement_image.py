@@ -35,12 +35,20 @@ def preparer_image(image_originale, total_dominos):
     return image_redimensionnee
 
 def image_vers_matrice(image_pil, type_jeu="double_six"):
-    # convertit chaque valeur des pixels de 0-255 à 0-6
+    """Convertit l'image (0-255) en une matrice de dominos (0-6 ou 0-9)."""
     valeur_max = 6 if type_jeu == "double_six" else 9
     matrice_pixels = np.array(image_pil) 
+    
+    # 1. Mise à l'échelle classique
     matrice_dominos = matrice_pixels / 255.0 
     matrice_dominos = matrice_dominos * valeur_max
     matrice_dominos = np.round(matrice_dominos).astype(int)
+    
+    # --- LA LIGNE MAGIQUE POUR CORRIGER L'EFFET NÉGATIF ---
+    # Un pixel noir (0) deviendra la valeur max (6 ou 9, donc plein de points noirs)
+    # Un pixel blanc (max) deviendra un 0 (aucun point noir, donc domino tout blanc)
+    matrice_dominos = valeur_max - matrice_dominos
+    
     return matrice_dominos
 
 def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
