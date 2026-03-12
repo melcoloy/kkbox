@@ -44,11 +44,12 @@ def image_vers_matrice(image_pil, type_jeu="double_six"):
     return matrice_dominos
 
 def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
-    """Crée l'image finale en dessinant les dominos un par un."""
+    """Crée l'image finale en dessinant les dominos un par un avec un fond blanc."""
     largeur_img = colonnes * taille_case
     hauteur_img = lignes * taille_case
     
-    image_finale = Image.new("RGB", (largeur_img, hauteur_img), "black")
+    # 1. On crée une image de fond blanche (au lieu de noire)
+    image_finale = Image.new("RGB", (largeur_img, hauteur_img), "white")
     dessin = ImageDraw.Draw(image_finale)
 
     def dessiner_points(x, y, valeur):
@@ -77,7 +78,8 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
 
         for p in pts:
             px, py = pos[p]
-            dessin.ellipse([px-r, py-r, px+r, py+r], fill="white")
+            # 2. Les points (pips) deviennent noirs (au lieu de blancs)
+            dessin.ellipse([px-r, py-r, px+r, py+r], fill="black")
 
     for p in placements:
         i1, j1 = p["case1"]
@@ -90,12 +92,19 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
         x_min, y_min = min(x1, x2), min(y1, y2)
         x_max, y_max = max(x1, x2) + taille_case, max(y1, y2) + taille_case
 
-        dessin.rectangle([x_min, y_min, x_max, y_max], fill=(30, 30, 30), outline="white", width=2)
+        # 3. Le corps du domino devient blanc cassé avec une bordure noire/grise
+        dessin.rectangle(
+            [x_min, y_min, x_max, y_max], 
+            fill=(245, 245, 245), # Un blanc très légèrement cassé pour le volume
+            outline="black", 
+            width=2
+        )
         
-        if i1 == i2: 
-            dessin.line([x2, y_min, x2, y_max], fill="white", width=2)
-        else: 
-            dessin.line([x_min, y2, x_max, y2], fill="white", width=2)
+        # 4. La ligne de séparation au milieu du domino devient noire
+        if i1 == i2: # Domino horizontal
+            dessin.line([x2, y_min, x2, y_max], fill="black", width=2)
+        else: # Domino vertical
+            dessin.line([x_min, y2, x_max, y2], fill="black", width=2)
 
         dessiner_points(x1, y1, v1)
         dessiner_points(x2, y2, v2)
