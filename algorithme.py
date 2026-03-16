@@ -67,13 +67,17 @@ def placer_dominos(matrice_valeurs, stock_dominos):
                         meilleur_idx_V = index
                         inv_V = (err_V_inv < err_V_norm)
 
-            # Le choix intelligent de l'orientation
+            # --- CORRECTION DU BUG : Le choix intelligent de l'orientation ---
             if peut_H and peut_V:
                 choix = 'H' if meilleur_ecart_H <= meilleur_ecart_V else 'V'
             elif peut_H:
                 choix = 'H'
-            else:
+            elif peut_V:
                 choix = 'V'
+            else:
+                # La case est isolée ! On ne peut placer ni H ni V.
+                # On passe à la case suivante pour ne pas déborder de l'image.
+                continue
                 
             # Application du choix
             if choix == 'H':
