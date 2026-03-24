@@ -1,6 +1,7 @@
 import streamlit as st
 from PIL import Image 
 import io
+import time
 import algorithme
 import algorithme_hongrois
 import traitement_image
@@ -63,12 +64,17 @@ with col2:
             # 3. Conversion en matrice mathématique
             matrice_valeurs = traitement_image.image_vers_matrice(image_prete, type_jeu)
             
-            # 4. Lancement de l'algorithme choisi
+            # 4. Lancement de l'algorithme choisi avec CHRONOMÈTRE
+            heure_debut = time.time() # On lance le chrono
+            
             if choix_algo == "Glouton (Rapide, sans trou)":
                 placements = algorithme.placer_dominos(matrice_valeurs, stock_dominos)
             else:
                 placements = algorithme_hongrois.placer_dominos(matrice_valeurs, stock_dominos)
                 
+            heure_fin = time.time() # On arrête le chrono
+            temps_execution = heure_fin - heure_debut # Calcul de la durée
+            
             st.success(f"🎉 Succès ! L'algorithme a placé {len(placements)} dominos (soit 100% du stock) !")
             
             # --- CALCUL DU SCORE DE FIDÉLITÉ ---
@@ -84,8 +90,15 @@ with col2:
             nb_pixels = matrice_valeurs.size
             score_fidelite = 100 * (1 - (erreur_totale / (nb_pixels * valeur_max)))
 
-            st.metric(label="🎯 Score de fidélité de la mosaïque", value=f"{score_fidelite:.2f} %")
+            # --- AFFICHAGE DES MÉTRIQUES EN DEUX COLONNES ---
+            col_met1, col_met2 = st.columns(2)
+            with col_met1:
+                st.metric(label="🎯 Score de fidélité", value=f"{score_fidelite:.2f} %")
+            with col_met2:
+                # On affiche le temps en secondes
+                st.metric(label="⏱️ Temps d'exécution", value=f"{temps_execution:.3f} s")
             
+            # Petits messages d'encouragement
             if score_fidelite > 90:
                 st.write("✨ *Excellent ! La ressemblance est quasi-parfaite.*")
             elif score_fidelite > 75:
