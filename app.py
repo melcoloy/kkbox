@@ -1,8 +1,10 @@
 import streamlit as st
 from PIL import Image 
+import io
 import algorithme
+import algorithme_hongrois
 import traitement_image
-import io 
+
 st.set_page_config(page_title="Mosaïque de dominos", layout="wide")
 st.title("🎲 Générateur de Mosaïque en Dominos")
 st.write("Projet P4 - Par Matteo Hanon Obsomer & Clément Leroy")
@@ -12,7 +14,18 @@ st.sidebar.header("Paramètres")
 type_jeu = st.sidebar.radio("Type de jeu :", ("double_six", "double_neuf"))
 nb_boites = st.sidebar.number_input("Nombre de boîtes", min_value=1, value=10, step=1)
 
+# Options avancées
+st.sidebar.markdown("---")
+st.sidebar.subheader("Options avancées")
+
+# Case à cocher pour la segmentation
 activer_contours = st.sidebar.checkbox("Activer la segmentation (Renforcer les contours)")
+
+# Choix de l'algorithme
+choix_algo = st.sidebar.radio(
+    "Choix de l'algorithme :", 
+    ("Glouton (Rapide, sans trou)", "Hongrois (Lent, optimum mathématique)")
+)
 
 btn_generer = st.sidebar.button("Générer la mosaïque")
 
@@ -38,36 +51,39 @@ with col2:
             total_dominos = len(stock_dominos)
             
             # 2. Prétraitement de l'image
-            image_prete = traitement_image.preparer_image(image_originale, total_dominos, activer_contours)
+            try:
+                # On essaie d'utiliser la fonction avec l'option des contours
+                image_prete = traitement_image.preparer_image(image_originale, total_dominos, activer_contours)
+            except TypeError:
+                # Sécurité : au cas où traitement_image.py n'a pas encore été mis à jour
+                image_prete = traitement_image.preparer_image(image_originale, total_dominos)
+                
             st.image(image_prete, caption=f"Image N&B ajustée ({image_prete.width}x{image_prete.height} px)", width=400)
             
             # 3. Conversion en matrice mathématique
             matrice_valeurs = traitement_image.image_vers_matrice(image_prete, type_jeu)
             
-            # 4. L'algorithme glouton (Placement)
-            placements = algorithme.placer_dominos(matrice_valeurs, stock_dominos)
+            # 4. Lancement de l'algorithme choisi
+            if choix_algo == "Glouton (Rapide, sans trou)":
+                placements = algorithme.placer_dominos(matrice_valeurs, stock_dominos)
+            else:
+                placements = algorithme_hongrois.placer_dominos(matrice_valeurs, stock_dominos)
+                
             st.success(f"🎉 Succès ! L'algorithme a placé {len(placements)} dominos (soit 100% du stock) !")
             
-            # AJOUT DU CALCUL DU SCORE DE FIDELITE
+            # --- CALCUL DU SCORE DE FIDÉLITÉ ---
             erreur_totale = 0
-            # On parcourt chaque placement pour comparer avec la matrice originale
             for p in placements:
                 i1, j1 = p["case1"]
                 i2, j2 = p["case2"]
                 v1, v2 = p["valeurs"]
-                
-                # Différence absolue entre le pixel et le domino choisi
                 erreur_totale += abs(matrice_valeurs[i1, j1] - v1)
                 erreur_totale += abs(matrice_valeurs[i2, j2] - v2)
             
-            # Calcul de l'erreur moyenne par rapport à la valeur max (6 ou 9)
             valeur_max = 6 if type_jeu == "double_six" else 9
             nb_pixels = matrice_valeurs.size
-            
-            # Score final en % (100% = parfait, 0% = n'importe quoi)
             score_fidelite = 100 * (1 - (erreur_totale / (nb_pixels * valeur_max)))
 
-            # Affichage d'une jolie jauge de performance
             st.metric(label="🎯 Score de fidélité de la mosaïque", value=f"{score_fidelite:.2f} %")
             
             if score_fidelite > 90:
@@ -76,6 +92,7 @@ with col2:
                 st.write("👍 *Bon résultat, les formes principales sont bien respectées.*")
             else:
                 st.write("⚠️ *Le stock de dominos était peut-être trop limité pour cette image.*")
+            
             # 5. Dessin final de la mosaïque
             st.subheader("🖼️ Votre Mosaïque")
             lignes, colonnes = matrice_valeurs.shape
@@ -84,8 +101,7 @@ with col2:
             st.image(image_mosaique, caption="Mosaïque générée avec succès !", use_container_width=True)
             st.balloons() 
 
-
-            # 6. Preuve d'inventaire pour vérifier la bonne proportion des dominos
+            # 6. Preuve d'inventaire
             st.divider()
             st.subheader("📊 Rapport d'inventaire")
             st.write("Vérification stricte des pièces utilisées (doit correspondre au nombre de boîtes) :")
@@ -104,25 +120,21 @@ with col2:
                     "index": "Type de domino",
                     "value": "Quantité placée"
                 })
-            # ajout d'un bouton permettant de télécharger l'image de domino
 
-            # tsf de l'image PIL en données  binaires pour le navigateur
+            # 7. --- TÉLÉCHARGEMENT PERSONNALISÉ ---
             st.divider()
             st.subheader("💾 Téléchargement")
             
-            # 1. On demande à l'utilisateur le nom qu'il souhaite (avec une valeur par défaut)
             nom_fichier = st.text_input("Nommez votre fichier :", value="ma_mosaique_dominos")
             
-            # On s'assure que le fichier a bien l'extension .png à la fin
+            # On ajoute l'extension .png automatiquement si l'utilisateur l'a oubliée
             if not nom_fichier.endswith(".png"):
                 nom_fichier += ".png"
 
-            # 2. tsf de l'image PIL en données binaires pour le navigateur
             buf = io.BytesIO()
             image_mosaique.save(buf, format="PNG")
             donnees_image = buf.getvalue()
             
-            # 3. On crée le bouton avec le nom personnalisé
             st.download_button(
                 label=f"📥 Télécharger : {nom_fichier}",
                 data=donnees_image,
