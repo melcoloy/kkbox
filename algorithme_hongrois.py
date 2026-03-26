@@ -1,10 +1,11 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+from typing import List, Tuple, Dict, Any
 
-def generer_inventaire(type_jeu="double_six", nb_boites=1):
+def generer_inventaire(type_jeu: str = "double_six", nb_boites: int = 1) -> List[Tuple[int, int]]:
     """Génère la liste des dominos (tuples) selon le jeu choisi."""
     valeur_max = 6 if type_jeu == "double_six" else 9
-    boite_unique = []
+    boite_unique: List[Tuple[int, int]] = []
     
     for i in range(valeur_max + 1):
         for j in range(i, valeur_max + 1):
@@ -13,14 +14,14 @@ def generer_inventaire(type_jeu="double_six", nb_boites=1):
     jeu_complet = boite_unique * nb_boites
     return jeu_complet
 
-def placer_dominos(matrice_valeurs, stock_dominos):
+def placer_dominos(matrice_valeurs: np.ndarray, stock_dominos: List[Tuple[int, int]]) -> List[Dict[str, Any]]:
     """
     Algorithme Ultime : 
     1. Pavage sans trou (Swapping)
     2. Assignation globale OPTIMALE via la Méthode Hongroise (Kuhn-Munkres)
     """
     lignes, colonnes = matrice_valeurs.shape
-    placements_slots = []
+    placements_slots: List[List[Tuple[int, int]]] = []
     grille_slots = np.zeros((lignes, colonnes), dtype=int)
     
     # --- ETAPE 1 : Pavage de base (Zéro trou garanti) ---
@@ -105,7 +106,7 @@ def placer_dominos(matrice_valeurs, stock_dominos):
     row_ind, col_ind = linear_sum_assignment(matrice_couts)
     
     # --- ETAPE 4 : Assemblage final ---
-    placements = []
+    placements: List[Dict[str, Any]] = []
     for i in range(N):
         idx_slot = row_ind[i]
         idx_domino = col_ind[i]
