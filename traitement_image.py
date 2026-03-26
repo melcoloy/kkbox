@@ -61,7 +61,7 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
 
     def dessiner_points(x, y, valeur):
         marge = taille_case // 4
-        r = taille_case // 6
+        r = taille_case // 8
         cx, cy = x + taille_case//2, y + taille_case//2 
         
         pos = {
