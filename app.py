@@ -35,7 +35,17 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.header("Image originale")
-    fichier_upload = st.file_uploader("Chargez votre image (JPG, PNG)", type=["jpg", "jpeg", "png"])
+    
+    # --- NOUVEAUTÉ : Choix de la source de l'image ---
+    choix_source = st.radio("Source de l'image :", ["📁 Importer un fichier", "📸 Prendre une photo"])
+    
+    fichier_upload = None
+    
+    if choix_source == "📁 Importer un fichier":
+        fichier_upload = st.file_uploader("Chargez votre image (JPG, PNG)", type=["jpg", "jpeg", "png"])
+    else:
+        # Streamlit gère nativement l'accès à la webcam !
+        fichier_upload = st.camera_input("Prenez une photo avec votre webcam")
     
     if fichier_upload is not None:
         image_originale = Image.open(fichier_upload)
