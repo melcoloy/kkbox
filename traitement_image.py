@@ -2,15 +2,18 @@ from PIL import Image, ImageDraw, ImageOps, ImageFilter
 import math
 import numpy as np
 
-def preparer_image(image_originale, total_dominos, renforcer_contraste=False):
+def preparer_image(image_originale, total_dominos, renforcer_contours=False):
     """
     Convertit l'image en noir et blanc(niveau de gris) et la redimensionne 
     en utilisant les diviseurs parfaits pour vider 100% du stock.
     """
     image_nb = image_originale.convert("L") 
     image_nb = ImageOps.autocontrast(image_nb)
-    if renforcer_contraste:
+    
+    # Segmentation optionnelle demandée par l'utilisateur
+    if renforcer_contours:
         image_nb = image_nb.filter(ImageFilter.EDGE_ENHANCE_MORE)
+    
     surface_cible = total_dominos * 2  
     
     largeur_orig, hauteur_orig = image_nb.size
@@ -42,9 +45,7 @@ def image_vers_matrice(image_pil, type_jeu="double_six"):
     matrice_dominos = matrice_dominos * valeur_max
     matrice_dominos = np.round(matrice_dominos).astype(int)
     
-    # --- CORRECTION DE L'EFFET NÉGATIF ---
-    # Pour des dominos blancs à points noirs, un pixel noir sur la photo
-    # doit correspondre au domino avec le plus de points noirs (le 6 ou le 9).
+    # CORRECTION DE L'EFFET NÉGATIF (Dominos blancs = fond blanc)
     matrice_dominos = valeur_max - matrice_dominos
     
     return matrice_dominos
@@ -61,7 +62,8 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
 
     def dessiner_points(x, y, valeur):
         marge = taille_case // 4
-        r = taille_case // 8
+        # Le choix de l'utilisateur : // 10 pour l'équilibre parfait
+        r = taille_case // 10 
         cx, cy = x + taille_case//2, y + taille_case//2 
         
         pos = {
@@ -89,8 +91,8 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
             dessin.ellipse([px-r, py-r, px+r, py+r], fill="black")
 
     # Calcul de l'espacement et de l'arrondi
-    padding = max(1, taille_case // 15) # Espace entre les dominos
-    rayon_arrondi = taille_case // 5    # Pour les coins doux
+    padding = max(1, taille_case // 15) 
+    rayon_arrondi = taille_case // 5    
 
     for p in placements:
         i1, j1 = p["case1"]
@@ -109,14 +111,13 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
         x2_pad = x_max - padding
         y2_pad = y_max - padding
 
-        # On dessine le domino blanc avec des coins arrondis
+        # On dessine le domino avec des bordures fines (width=1)
         try:
             dessin.rounded_rectangle([x1_pad, y1_pad, x2_pad, y2_pad], radius=rayon_arrondi, fill="white", outline="black", width=1)
         except AttributeError:
-            # Sécurité si une très vieille version de Pillow est installée
             dessin.rectangle([x1_pad, y1_pad, x2_pad, y2_pad], fill="white", outline="black", width=1)
         
-        # La ligne de séparation au milieu (plus fine que la bordure globale)
+        # La ligne de séparation au milieu fine (width=1)
         if i1 == i2: # Domino horizontal
             dessin.line([x2, y1_pad, x2, y2_pad], fill="black", width=1)
         else: # Domino vertical
