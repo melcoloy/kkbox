@@ -5,6 +5,8 @@ import time
 import algorithme
 import algorithme_hongrois
 import traitement_image
+import base64
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Mosaïque de dominos", layout="wide")
 st.title("🎲 Générateur de Mosaïque en Dominos")
@@ -163,3 +165,30 @@ with col2:
                 file_name=nom_fichier,
                 mime="image/png"
             )
+
+            # bouton d'impression (injection via html/js)
+            st.divider()
+            st.subheader("🖨️ Impression")
+            st.write("Vous pouvez imprimer directement votre mosaïque depuis votre navigateur :")
+
+            # encondage de l'image en texte  (base64) pour pouvoir l'envoyer au navigateur html
+            b64_image = base64.b64encode(donnees_image).decode()
+
+            # code html et JavaScript du bouton d'impression
+            html_bouton = f"""
+            <div style="text-align: left;">
+                <button onclick="
+                    var w = window.open('');
+                    w.document.write('<html><head><title>Impression Mosaique</title></head><body style=\\'margin:0;display:flex;justify-content:center;align-items:center;height:100vh;\\'><img src=\\'data:image/png;base64,{b64_image}\\' style=\\'max-width:100%;max-height:100%;\\'></body></html>');
+                    w.document.close();
+                    w.focus();
+                    setTimeout(function() {{ w.print(); w.close(); }}, 500);
+                " style="background-color: #ffffff; color: #31333F; padding: 10px 24px; border: 1px solid #dcdcdc; border-radius: 8px; cursor: pointer; font-size: 16px; font-family: sans-serif; transition: 0.3s;"
+                onmouseover="this.style.borderColor='#FF4B4B'; this.style.color='#FF4B4B';"
+                onmouseout="this.style.borderColor='#dcdcdc'; this.style.color='#31333F';">
+                    🖨️ Lancer l'impression
+                </button>
+            </div>
+            """
+            # affichage du bouton dans Streamlit
+            components.html(html_bouton, height=60)
