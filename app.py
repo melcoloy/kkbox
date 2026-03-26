@@ -25,7 +25,7 @@ activer_contours = st.sidebar.checkbox("Activer la segmentation (Renforcer les c
 # Choix de l'algorithme
 choix_algo = st.sidebar.radio(
     "Choix de l'algorithme :", 
-    ("Glouton (Rapide, sans trou)", "Hongrois (Lent, optimum mathématique)")
+    ("Glouton (Rapide, par le centre)", "Hongrois (Lent, optimum mathématique)")
 )
 
 btn_generer = st.sidebar.button("Générer la mosaïque")
@@ -56,7 +56,7 @@ with col2:
                 # On essaie d'utiliser la fonction avec l'option des contours
                 image_prete = traitement_image.preparer_image(image_originale, total_dominos, activer_contours)
             except TypeError:
-                # Sécurité : au cas où traitement_image.py n'a pas encore été mis à jour
+                # Sécurité
                 image_prete = traitement_image.preparer_image(image_originale, total_dominos)
                 
             st.image(image_prete, caption=f"Image N&B ajustée ({image_prete.width}x{image_prete.height} px)", width=400)
@@ -65,16 +65,16 @@ with col2:
             matrice_valeurs = traitement_image.image_vers_matrice(image_prete, type_jeu)
             
             # 4. Lancement de l'algorithme choisi avec CHRONOMÈTRE
-            heure_debut = time.time() # On lance le chrono
+            heure_debut = time.time() 
             
-            if choix_algo == "Glouton (Rapide, sans trou)":
+            if choix_algo == "Glouton (Rapide, par le centre)":
                 placements = algorithme.placer_dominos(matrice_valeurs, stock_dominos)
             else:
                 placements = algorithme_hongrois.placer_dominos(matrice_valeurs, stock_dominos)
                 
-            heure_fin = time.time() # On arrête le chrono
-            temps_execution = heure_fin - heure_debut # Calcul de la durée
-            
+            heure_fin = time.time()
+            temps_execution = heure_fin - heure_debut 
+                
             st.success(f"🎉 Succès ! L'algorithme a placé {len(placements)} dominos (soit 100% du stock) !")
             
             # --- CALCUL DU SCORE DE FIDÉLITÉ ---
@@ -90,15 +90,13 @@ with col2:
             nb_pixels = matrice_valeurs.size
             score_fidelite = 100 * (1 - (erreur_totale / (nb_pixels * valeur_max)))
 
-            # --- AFFICHAGE DES MÉTRIQUES EN DEUX COLONNES ---
+            # --- AFFICHAGE DES MÉTRIQUES ---
             col_met1, col_met2 = st.columns(2)
             with col_met1:
                 st.metric(label="🎯 Score de fidélité", value=f"{score_fidelite:.2f} %")
             with col_met2:
-                # On affiche le temps en secondes
                 st.metric(label="⏱️ Temps d'exécution", value=f"{temps_execution:.3f} s")
             
-            # Petits messages d'encouragement
             if score_fidelite > 90:
                 st.write("✨ *Excellent ! La ressemblance est quasi-parfaite.*")
             elif score_fidelite > 75:
@@ -134,13 +132,12 @@ with col2:
                     "value": "Quantité placée"
                 })
 
-            # 7. --- TÉLÉCHARGEMENT PERSONNALISÉ ---
+            # 7. Téléchargement personnalisé
             st.divider()
             st.subheader("💾 Téléchargement")
             
             nom_fichier = st.text_input("Nommez votre fichier :", value="ma_mosaique_dominos")
             
-            # On ajoute l'extension .png automatiquement si l'utilisateur l'a oubliée
             if not nom_fichier.endswith(".png"):
                 nom_fichier += ".png"
 

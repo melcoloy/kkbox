@@ -4,7 +4,7 @@ import numpy as np
 
 def preparer_image(image_originale, total_dominos, renforcer_contours=False):
     """
-    Convertit l'image en noir et blanc(niveau de gris) et la redimensionne 
+    Convertit l'image en noir et blanc (niveau de gris) et la redimensionne 
     en utilisant les diviseurs parfaits pour vider 100% du stock.
     """
     image_nb = image_originale.convert("L") 
