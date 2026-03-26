@@ -22,6 +22,8 @@ st.sidebar.subheader("Options avancées")
 # Case à cocher pour la segmentation
 activer_contours = st.sidebar.checkbox("Activer la segmentation (Renforcer les contours)")
 
+# dithering
+activer_dithering = st.sidebar.checkbox("Activer le Dithering (Algorithme Floyd-Steinberg)", value=True)
 # Choix de l'algorithme
 choix_algo = st.sidebar.radio(
     "Choix de l'algorithme :", 

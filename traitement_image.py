@@ -37,13 +37,43 @@ def preparer_image(image_originale, total_dominos, renforcer_contours=False):
     image_redimensionnee = image_nb.resize((nouvelle_largeur, nouvelle_hauteur))
     return image_redimensionnee
 
-def image_vers_matrice(image_pil, type_jeu="double_six"):
-    """Convertit l'image (0-255) en une matrice de dominos (0-6 ou 0-9)."""
+def image_vers_matrice(image_pil, type_jeu="double_six", appliquer_dithering=True):
+    """Convertit l'image en une matrice de dominos, avec propagation d'erreur (Floyd-Steinberg)."""
     valeur_max = 6 if type_jeu == "double_six" else 9
-    matrice_pixels = np.array(image_pil) 
-    matrice_dominos = matrice_pixels / 255.0 
-    matrice_dominos = matrice_dominos * valeur_max
-    matrice_dominos = np.round(matrice_dominos).astype(int)
+    
+    # On travaille avec des nombres à virgule (float) pour garder l'erreur
+    matrice = np.array(image_pil, dtype=float)
+    matrice = (matrice / 255.0) * valeur_max
+    
+    lignes, colonnes = matrice.shape
+    
+    if appliquer_dithering:
+        # Algorithme de Floyd-Steinberg
+        for i in range(lignes):
+            for j in range(colonnes):
+                ancienne_valeur = matrice[i, j]
+                nouvelle_valeur = np.round(ancienne_valeur)
+                # On s'assure de ne pas dépasser les limites des dominos
+                nouvelle_valeur = min(valeur_max, max(0, nouvelle_valeur))
+                matrice[i, j] = nouvelle_valeur
+                
+                # Calcul de l'erreur d'arrondi
+                erreur = ancienne_valeur - nouvelle_valeur
+                
+                # On propage l'erreur aux voisins (selon les fractions de Floyd-Steinberg)
+                if j + 1 < colonnes:
+                    matrice[i, j + 1] += erreur * (7 / 16)
+                if i + 1 < lignes:
+                    if j - 1 >= 0:
+                        matrice[i + 1, j - 1] += erreur * (3 / 16)
+                    matrice[i + 1, j] += erreur * (5 / 16)
+                    if j + 1 < colonnes:
+                        matrice[i + 1, j + 1] += erreur * (1 / 16)
+    else:
+        matrice = np.round(matrice)
+        
+    matrice_dominos = matrice.astype(int)
+    matrice_dominos = np.clip(matrice_dominos, 0, valeur_max)
     
     # CORRECTION DE L'EFFET NÉGATIF (Dominos blancs = fond blanc)
     matrice_dominos = valeur_max - matrice_dominos
