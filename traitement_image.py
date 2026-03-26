@@ -61,7 +61,7 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
 
     def dessiner_points(x, y, valeur):
         marge = taille_case // 4
-        r = taille_case // 12 
+        r = taille_case // 6
         cx, cy = x + taille_case//2, y + taille_case//2 
         
         pos = {
@@ -111,16 +111,16 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
 
         # On dessine le domino blanc avec des coins arrondis
         try:
-            dessin.rounded_rectangle([x1_pad, y1_pad, x2_pad, y2_pad], radius=rayon_arrondi, fill="white", outline="black", width=2)
+            dessin.rounded_rectangle([x1_pad, y1_pad, x2_pad, y2_pad], radius=rayon_arrondi, fill="white", outline="black", width=1)
         except AttributeError:
             # Sécurité si une très vieille version de Pillow est installée
-            dessin.rectangle([x1_pad, y1_pad, x2_pad, y2_pad], fill="white", outline="black", width=2)
+            dessin.rectangle([x1_pad, y1_pad, x2_pad, y2_pad], fill="white", outline="black", width=1)
         
         # La ligne de séparation au milieu (plus fine que la bordure globale)
         if i1 == i2: # Domino horizontal
-            dessin.line([x2, y1_pad, x2, y2_pad], fill="black", width=2)
+            dessin.line([x2, y1_pad, x2, y2_pad], fill="black", width=1)
         else: # Domino vertical
-            dessin.line([x1_pad, y2, x2_pad, y2], fill="black", width=2)
+            dessin.line([x1_pad, y2, x2_pad, y2], fill="black", width=1)
 
         # On dessine les points par-dessus
         dessiner_points(x1, y1, v1)
