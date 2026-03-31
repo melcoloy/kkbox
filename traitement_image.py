@@ -157,4 +157,4 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
         dessiner_points(x1, y1, v1)
         dessiner_points(x2, y2, v2)
 
-    return image_finale
+    return image_finale 
