@@ -315,7 +315,7 @@ with col2:
             st.metric(label="⏱️ Temps d'exécution", value=f"{temps_execution:.3f} s")
         
         # ---------------------------------------------------------
-        # RECHERCHE VISUELLE SYNCHRONISÉE (CLIC + BOUTONS)
+        # RECHERCHE VISUELLE SYNCHRONISÉE (CORRIGÉE)
         # ---------------------------------------------------------
         st.divider()
         st.subheader("🔍 Analyse Visuelle Interactive")
@@ -324,39 +324,47 @@ with col2:
         valeur_max_jeu = 6 if type_jeu == "double_six" else 9
         options_chiffres = ["Aucun"] + list(range(valeur_max_jeu + 1))
         
-        # Création de la variable d'état si elle n'existe pas
+        # 1. Création de la variable d'état si elle n'existe pas
         if 'chiffre_cible' not in st.session_state:
-            st.session_state.chiffre_cible = "Aucun"
+            st.session_state['chiffre_cible'] = "Aucun"
             
-        # Le sélecteur est lié directement à la mémoire de Streamlit
-        st.radio(
+        # 2. On cherche à quelle position se trouve le choix actuel pour l'afficher sur le bouton radio
+        index_actuel = options_chiffres.index(st.session_state['chiffre_cible']) if st.session_state['chiffre_cible'] in options_chiffres else 0
+            
+        # 3. Le sélecteur N'A PLUS de 'key'. On lui donne juste l'index à afficher.
+        chiffre_selectionne = st.radio(
             "Chiffre à analyser :", 
             options_chiffres, 
-            horizontal=True,
-            key="chiffre_cible" # Liaison magique avec st.session_state.chiffre_cible
+            index=index_actuel,
+            horizontal=True
         )
         
+        # 4. Si l'utilisateur clique sur le bouton radio
+        if chiffre_selectionne != st.session_state['chiffre_cible']:
+            st.session_state['chiffre_cible'] = chiffre_selectionne
+            st.rerun() # On recharge immédiatement la page
+        
         # On détermine l'entier exact à envoyer à la fonction de dessin
-        c_cible = None if st.session_state.chiffre_cible == "Aucun" else int(st.session_state.chiffre_cible)
+        c_cible = None if st.session_state['chiffre_cible'] == "Aucun" else int(st.session_state['chiffre_cible'])
 
         # DESSIN INTERACTIF
         st.subheader("🖼️ Votre Mosaïque")
         lignes, colonnes = matrice_reference.shape
         taille_case = 40 # Standard de votre module
         
-        # 1. On dessine l'image avec la surbrillance choisie
+        # On dessine l'image avec la surbrillance choisie
         image_mosaique = traitement_image.dessiner_mosaique(placements, lignes, colonnes, taille_case=taille_case, chiffre_cible=c_cible)
         
-        # 2. On l'affiche de façon interactive (remplace st.image)
+        # On l'affiche de façon interactive
         click_data = streamlit_image_coordinates(image_mosaique, key="mosaique_interactive")
         
-        # 3. Interception d'un clic de souris de l'utilisateur
+        # 5. Interception d'un clic de souris de l'utilisateur sur l'image
         if click_data is not None:
             last_click = st.session_state.get('last_click', None)
             
             # S'il s'agit d'un nouveau clic
             if click_data != last_click:
-                st.session_state.last_click = click_data # On le mémorise
+                st.session_state['last_click'] = click_data # On le mémorise
                 
                 # Conversion du pixel cliqué en coordonnées de grille
                 x_pixel, y_pixel = click_data['x'], click_data['y']
@@ -367,11 +375,10 @@ with col2:
                 if row_grille < lignes and col_grille < colonnes:
                     chiffre_clique = int(matrice_reference[row_grille, col_grille])
                     
-                    # On met à jour la mémoire (ce qui mettra aussi à jour le bouton radio en haut !)
-                    st.session_state.chiffre_cible = chiffre_clique
-                    
-                    # On relance instantanément la page pour appliquer la couleur
-                    st.rerun()
+                    # On vérifie qu'on ne clique pas sur un chiffre déjà sélectionné
+                    if st.session_state['chiffre_cible'] != chiffre_clique:
+                        st.session_state['chiffre_cible'] = chiffre_clique
+                        st.rerun() # Et on recharge la page (ce qui mettra à jour le bouton radio au passage !)
 
         # INVENTAIRE
         st.divider()
