@@ -17,7 +17,7 @@ import traitement_image
 
 
 # =====================================================================
-# 1. FONCTIONS MATHÉMATIQUES ET ALGORITHMES (Anciennement app_v2.py)
+# 1. FONCTIONS MATHÉMATIQUES ET ALGORITHMES
 # =====================================================================
 
 def transfo_image(image, colonnes, lignes):
@@ -28,7 +28,6 @@ def transfo_image(image, colonnes, lignes):
 def valeurs_grille(image, type_jeu="double_six"):
     val_max = 6 if type_jeu == "double_six" else 9
     matrice_pixels = np.array(image)
-    # Inversion pour dominos blancs (pixel blanc 255 -> 0 point / pixel noir 0 -> 6 points)
     matrice_valeurs = np.round((matrice_pixels / 255.0) * val_max).astype(int)
     matrice_valeurs = val_max - matrice_valeurs 
     return matrice_valeurs
@@ -46,7 +45,6 @@ def generer_inventaire_v2(nb_dominos_necessaires, type_jeu="double_six", matrice
         
     if reste > 0:
         if matrice_cibles is not None:
-            # --- MÉTHODE INTELLIGENTE ---
             valeurs, clics = np.unique(matrice_cibles, return_counts=True)
             frequences = dict(zip(valeurs, clics))
             
@@ -177,7 +175,6 @@ type_jeu = st.sidebar.radio("Type de jeu :", ("double_six", "double_neuf"), key=
 nb_boites = st.sidebar.number_input("Nombre de boîtes", min_value=1, value=10, step=1)
 largeur_grille = st.sidebar.slider("Largeur (en nombre de dominos)", min_value=60, max_value=160, step=10, key="slider_largeur")
 
-# Choix de l'algorithme
 choix_algo = st.sidebar.radio(
     "Choix de l'algorithme :", 
     ("Glouton (Rapide, par le centre)", "Hongrois (Lent, optimum mathématique)", "Méta-Heuristique (Aléatoire)","Hongrois (Matteo)"),key="radio_algo_main"
@@ -185,37 +182,46 @@ choix_algo = st.sidebar.radio(
 
 btn_generer = st.sidebar.button("Générer la mosaïque")
 
+# Nettoyage de la mémoire si on change d'image (Optionnel mais propre)
+def clear_session():
+    if 'placements' in st.session_state:
+        del st.session_state['placements']
+
 # --- Zone principale ---
 col1, col2 = st.columns(2)
 
 with col1:
     st.header("Image originale")
     
-    choix_source = st.radio("Source de l'image :", ["📁 Importer un fichier", "📸 Prendre une photo"], key="radio_source_main")
+    choix_source = st.radio("Source de l'image :", ["📁 Importer un fichier", "📸 Prendre une photo"], key="radio_source_main", on_change=clear_session)
     
     fichier_upload = None
     
     if choix_source == "📁 Importer un fichier":
-        fichier_upload = st.file_uploader("Chargez votre image (JPG, PNG)", type=["jpg", "jpeg", "png"])
+        fichier_upload = st.file_uploader("Chargez votre image (JPG, PNG)", type=["jpg", "jpeg", "png"], on_change=clear_session)
     else:
-        fichier_upload = st.camera_input("Prenez une photo avec votre webcam")
+        fichier_upload = st.camera_input("Prenez une photo avec votre webcam", on_change=clear_session)
     
     if fichier_upload is not None:
         image_originale = Image.open(fichier_upload)
         st.image(image_originale, caption="Image importée", width=400)
         st.success("Image chargée avec succès ! Prête pour l'algo.")
 
+
 with col2:
     st.header("Résultat")
     
+    # ---------------------------------------------------------
+    # PARTIE 1 : CALCULS LOURDS UNIQUEMENT SI ON CLIQUE "GÉNÉRER"
+    # ---------------------------------------------------------
     if fichier_upload is not None and btn_generer:
         with st.spinner("Calculs et assemblage en cours..."):
             
-            # 1. Génération du stock
+            # Génération du stock
             stock_dominos = algorithme.generer_inventaire(type_jeu, nb_boites)
             total_dominos = len(stock_dominos)
 
-            # Variables communes et Matteo
+            # Variables communes
             largeur_px, hauteur_px = image_originale.size
             ratio = hauteur_px / largeur_px
             hauteur_grille = int(largeur_grille * ratio)
@@ -226,38 +232,29 @@ with col2:
             inventaire = generer_inventaire_v2(nb_dominos, type_jeu, matrice)
             emplacements = generer_emplacements(largeur_grille, hauteur_grille)
             
-            # 2. Prétraitement de l'image
+            # Prétraitement de l'image
             image_prete = traitement_image.preparer_image(image_originale, total_dominos)
-            st.image(image_prete, caption=f"Image N&B ajustée ({image_prete.width}x{image_prete.height} px)", width=400)
-            
-            # 3. Conversion en matrice mathématique
             matrice_valeurs = traitement_image.image_vers_matrice(image_prete, type_jeu)
             
-            # 4. Lancement de l'algorithme choisi avec CHRONOMÈTRE
+            # Lancement de l'algorithme choisi
             heure_debut = time.time() 
             my_bar = st.progress(0, text="Optimisation des pièces en cours...")
-            
-            # On garde une trace de la matrice utilisée
             matrice_reference = matrice_valeurs 
             
             if choix_algo == "Glouton (Rapide, par le centre)":
                 placements = algorithme.placer_dominos(matrice_valeurs, stock_dominos)
-                
             elif choix_algo == "Méta-Heuristique (Aléatoire)":
                 placements_bruts = optimiser_placement_recuit(matrice, emplacements, inventaire, iterations=150000, st_progress_bar=my_bar)
                 matrice_reference = matrice 
-                
             elif choix_algo == "Hongrois (Matteo)":
                 placements_bruts = optimiser_placement_hongrois(matrice, emplacements, inventaire, st_progress_bar=my_bar)
                 matrice_reference = matrice 
-                
             else:
                 placements = hongrois_v1.placer_dominos(matrice_valeurs, stock_dominos)
                 
-            heure_fin = time.time()
-            temps_execution = heure_fin - heure_debut 
+            temps_execution = time.time() - heure_debut 
             
-            # --- CORRECTION VITALE : Conversion des Tuples V2 en Dictionnaires universels ---
+            # Conversion V2 
             if choix_algo in ["Méta-Heuristique (Aléatoire)", "Hongrois (Matteo)"]:
                 placements = []
                 for idx, (val1, val2) in enumerate(placements_bruts):
@@ -268,121 +265,129 @@ with col2:
                         "valeurs": (val1, val2)
                     })
                     
-            st.success(f"🎉 Succès ! L'algorithme a placé {len(placements)} dominos (soit 100% du stock) !")
-            
-            # --- CALCUL DU SCORE DE FIDÉLITÉ ---
-            erreur_totale = 0
-            for p in placements:
-                i1, j1 = p["case1"]
-                i2, j2 = p["case2"]
-                v1, v2 = p["valeurs"]
-                
-                erreur_totale += abs(matrice_reference[i1, j1] - v1)
-                erreur_totale += abs(matrice_reference[i2, j2] - v2)
-            
-            valeur_max = 6 if type_jeu == "double_six" else 9
-            nb_pixels = matrice_reference.size
-            score_fidelite = 100 * (1 - (erreur_totale / (nb_pixels * valeur_max)))
+            # --- SAUVEGARDE EN MÉMOIRE POUR RÉSISTER AUX CLICS DES WIDGETS ---
+            st.session_state['placements'] = placements
+            st.session_state['matrice_reference'] = matrice_reference
+            st.session_state['image_prete'] = image_prete
+            st.session_state['temps_execution'] = temps_execution
 
-            # --- AFFICHAGE DES MÉTRIQUES ---
-            col_met1, col_met2 = st.columns(2)
-            with col_met1:
-                st.metric(label="🎯 Score de fidélité", value=f"{score_fidelite:.2f} %")
-            with col_met2:
-                st.metric(label="⏱️ Temps d'exécution", value=f"{temps_execution:.3f} s")
-            
-            if score_fidelite > 90:
-                st.write("✨ *Excellent ! La ressemblance est quasi-parfaite.*")
-            elif score_fidelite > 75:
-                st.write("👍 *Bon résultat, les formes principales sont bien respectées.*")
-            else:
-                st.write("⚠️ *Le stock de dominos était peut-être trop limité pour cette image.*")
-            
-            # --- NOUVELLE FONCTIONNALITÉ : RECHERCHE VISUELLE ---
-            st.divider()
-            st.subheader("🔍 Analyse Visuelle de l'Inventaire")
-            st.write("Sélectionnez un chiffre pour mettre en évidence son emplacement sur la mosaïque :")
-            
-            valeur_max_jeu = 6 if type_jeu == "double_six" else 9
-            options_chiffres = ["Aucun"] + list(range(valeur_max_jeu + 1))
-            
-            chiffre_selectionne = st.radio(
-                "Mettre en évidence le chiffre :", 
-                options_chiffres, 
-                horizontal=True
-            )
-            
-            chiffre_cible = None if chiffre_selectionne == "Aucun" else int(chiffre_selectionne)
 
-            # 5. Dessin final de la mosaïque avec le filtre visuel
-            st.subheader("🖼️ Votre Mosaïque")
-            lignes, colonnes = matrice_reference.shape
-            
-            image_mosaique = traitement_image.dessiner_mosaique(placements, lignes, colonnes, chiffre_cible=chiffre_cible)
-            
-            st.image(image_mosaique, caption="Mosaïque générée avec succès !", use_container_width=True)
-            st.balloons() 
+    # ---------------------------------------------------------
+    # PARTIE 2 : AFFICHAGE INTERACTIF (Utilise la mémoire)
+    # ---------------------------------------------------------
+    if fichier_upload is not None and 'placements' in st.session_state:
+        
+        # Récupération des données depuis la mémoire de Streamlit
+        placements = st.session_state['placements']
+        matrice_reference = st.session_state['matrice_reference']
+        image_prete = st.session_state['image_prete']
+        temps_execution = st.session_state['temps_execution']
 
-            # 6. Preuve d'inventaire
-            st.divider()
-            st.subheader("📊 Rapport d'inventaire")
-            st.write("Vérification stricte des pièces utilisées :")
+        st.image(image_prete, caption=f"Image N&B ajustée ({image_prete.width}x{image_prete.height} px)", width=400)
+        st.success(f"🎉 Succès ! L'algorithme a placé {len(placements)} dominos (soit 100% du stock) !")
+        
+        # CALCUL DU SCORE
+        erreur_totale = 0
+        for p in placements:
+            i1, j1 = p["case1"]
+            i2, j2 = p["case2"]
+            v1, v2 = p["valeurs"]
+            erreur_totale += abs(matrice_reference[i1, j1] - v1)
+            erreur_totale += abs(matrice_reference[i2, j2] - v2)
+        
+        valeur_max = 6 if type_jeu == "double_six" else 9
+        nb_pixels = matrice_reference.size
+        score_fidelite = 100 * (1 - (erreur_totale / (nb_pixels * valeur_max)))
 
-            inventaire_utilise = {}
-            for placement in placements:
-                v1, v2 = placement["valeurs"]
-                nom_domino = f"[{min(v1, v2)} | {max(v1, v2)}]"
-                inventaire_utilise[nom_domino] = inventaire_utilise.get(nom_domino, 0) + 1
+        # AFFICHAGE DES MÉTRIQUES
+        col_met1, col_met2 = st.columns(2)
+        with col_met1:
+            st.metric(label="🎯 Score de fidélité", value=f"{score_fidelite:.2f} %")
+        with col_met2:
+            st.metric(label="⏱️ Temps d'exécution", value=f"{temps_execution:.3f} s")
+        
+        # RECHERCHE VISUELLE (Cette partie ne fait plus planter l'app !)
+        st.divider()
+        st.subheader("🔍 Analyse Visuelle de l'Inventaire")
+        st.write("Sélectionnez un chiffre pour mettre en évidence son emplacement sur la mosaïque :")
+        
+        valeur_max_jeu = 6 if type_jeu == "double_six" else 9
+        options_chiffres = ["Aucun"] + list(range(valeur_max_jeu + 1))
+        
+        chiffre_selectionne = st.radio(
+            "Mettre en évidence le chiffre :", 
+            options_chiffres, 
+            horizontal=True
+        )
+        
+        chiffre_cible = None if chiffre_selectionne == "Aucun" else int(chiffre_selectionne)
 
-            inventaire_trie = dict(sorted(inventaire_utilise.items()))
+        # DESSIN INTERACTIF
+        st.subheader("🖼️ Votre Mosaïque")
+        lignes, colonnes = matrice_reference.shape
+        
+        # Dessine l'image avec ou sans mise en évidence (très rapide, donc on peut le faire à chaque clic)
+        image_mosaique = traitement_image.dessiner_mosaique(placements, lignes, colonnes, chiffre_cible=chiffre_cible)
+        
+        st.image(image_mosaique, caption="Mosaïque générée avec succès !", use_container_width=True)
 
-            col_tab, col_vide = st.columns([1.5, 2])
-            with col_tab:
-                st.dataframe(inventaire_trie, column_config={
-                    "index": "Type de domino",
-                    "value": "Quantité placée"
-                })
+        # INVENTAIRE
+        st.divider()
+        st.subheader("📊 Rapport d'inventaire")
+        inventaire_utilise = {}
+        for placement in placements:
+            v1, v2 = placement["valeurs"]
+            nom_domino = f"[{min(v1, v2)} | {max(v1, v2)}]"
+            inventaire_utilise[nom_domino] = inventaire_utilise.get(nom_domino, 0) + 1
 
-            # 7. Téléchargement personnalisé
-            st.divider()
-            st.subheader("💾 Téléchargement")
-            
-            nom_fichier = st.text_input("Nommez votre fichier :", value="ma_mosaique_dominos")
-            
-            if not nom_fichier.endswith(".png"):
-                nom_fichier += ".png"
+        inventaire_trie = dict(sorted(inventaire_utilise.items()))
 
-            buf = io.BytesIO()
-            image_mosaique.save(buf, format="PNG")
-            donnees_image = buf.getvalue()
-            
-            st.download_button(
-                label=f"📥 Télécharger : {nom_fichier}",
-                data=donnees_image,
-                file_name=nom_fichier,
-                mime="image/png"
-            )
+        col_tab, col_vide = st.columns([1.5, 2])
+        with col_tab:
+            st.dataframe(inventaire_trie, column_config={
+                "index": "Type de domino",
+                "value": "Quantité placée"
+            })
 
-            # 8. Impression (injection via html/js)
-            st.divider()
-            st.subheader("🖨️ Impression")
-            st.write("Vous pouvez imprimer directement votre mosaïque depuis votre navigateur :")
+        # TÉLÉCHARGEMENT
+        st.divider()
+        st.subheader("💾 Téléchargement")
+        
+        nom_fichier = st.text_input("Nommez votre fichier :", value="ma_mosaique_dominos")
+        
+        if not nom_fichier.endswith(".png"):
+            nom_fichier += ".png"
 
-            b64_image = base64.b64encode(donnees_image).decode()
+        buf = io.BytesIO()
+        image_mosaique.save(buf, format="PNG")
+        donnees_image = buf.getvalue()
+        
+        st.download_button(
+            label=f"📥 Télécharger : {nom_fichier}",
+            data=donnees_image,
+            file_name=nom_fichier,
+            mime="image/png"
+        )
 
-            html_bouton = f"""
-            <div style="text-align: left;">
-                <button onclick="
-                    var w = window.open('');
-                    w.document.write('<html><head><title>Impression Mosaique</title></head><body style=\\'margin:0;display:flex;justify-content:center;align-items:center;height:100vh;\\'><img src=\\'data:image/png;base64,{b64_image}\\' style=\\'max-width:100%;max-height:100%;\\'></body></html>');
-                    w.document.close();
-                    w.focus();
-                    setTimeout(function() {{ w.print(); w.close(); }}, 500);
-                " style="background-color: #ffffff; color: #31333F; padding: 10px 24px; border: 1px solid #dcdcdc; border-radius: 8px; cursor: pointer; font-size: 16px; font-family: sans-serif; transition: 0.3s;"
-                onmouseover="this.style.borderColor='#FF4B4B'; this.style.color='#FF4B4B';"
-                onmouseout="this.style.borderColor='#dcdcdc'; this.style.color='#31333F';">
-                    🖨️ Lancer l'impression
-                </button>
-            </div>
-            """
-            components.html(html_bouton, height=60)
+        # IMPRESSION
+        st.divider()
+        st.subheader("🖨️ Impression")
+
+        b64_image = base64.b64encode(donnees_image).decode()
+
+        html_bouton = f"""
+        <div style="text-align: left;">
+            <button onclick="
+                var w = window.open('');
+                w.document.write('<html><head><title>Impression Mosaique</title></head><body style=\\'margin:0;display:flex;justify-content:center;align-items:center;height:100vh;\\'><img src=\\'data:image/png;base64,{b64_image}\\' style=\\'max-width:100%;max-height:100%;\\'></body></html>');
+                w.document.close();
+                w.focus();
+                setTimeout(function() {{ w.print(); w.close(); }}, 500);
+            " style="background-color: #ffffff; color: #31333F; padding: 10px 24px; border: 1px solid #dcdcdc; border-radius: 8px; cursor: pointer; font-size: 16px; font-family: sans-serif; transition: 0.3s;"
+            onmouseover="this.style.borderColor='#FF4B4B'; this.style.color='#FF4B4B';"
+            onmouseout="this.style.borderColor='#dcdcdc'; this.style.color='#31333F';">
+                🖨️ Lancer l'impression
+            </button>
+        </div>
+        """
+        components.html(html_bouton, height=60)
