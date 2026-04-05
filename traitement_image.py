@@ -80,8 +80,8 @@ def image_vers_matrice(image_pil, type_jeu="double_six", appliquer_dithering=Tru
     
     return matrice_dominos
 
-def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
-    """Crée l'image finale avec des dominos blancs séparés visuellement."""
+def dessiner_mosaique(placements, lignes, colonnes, taille_case=40, chiffre_cible=None):
+    """Crée l'image finale avec option de mise en évidence d'un chiffre."""
     largeur_img = colonnes * taille_case
     hauteur_img = lignes * taille_case
     
@@ -92,7 +92,6 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
 
     def dessiner_points(x, y, valeur):
         marge = taille_case // 4
-        # Le choix de l'utilisateur : // 10 pour l'équilibre parfait
         r = taille_case // 10 
         cx, cy = x + taille_case//2, y + taille_case//2 
         
@@ -117,10 +116,8 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
 
         for p in pts:
             px, py = pos[p]
-            # Les points (pips) sont noirs
             dessin.ellipse([px-r, py-r, px+r, py+r], fill="black")
 
-    # Calcul de l'espacement et de l'arrondi
     padding = max(1, taille_case // 15) 
     rayon_arrondi = taille_case // 5    
 
@@ -135,25 +132,54 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40):
         x_min, y_min = min(x1, x2), min(y1, y2)
         x_max, y_max = max(x1, x2) + taille_case, max(y1, y2) + taille_case
 
-        # Coordonnées du domino AVEC l'espacement (padding)
         x1_pad = x_min + padding
         y1_pad = y_min + padding
         x2_pad = x_max - padding
         y2_pad = y_max - padding
 
-        # On dessine le domino avec des bordures fines (width=1)
+        # --- LOGIQUE DE MISE EN ÉVIDENCE (Couleurs) ---
+        base_fill = "white"
+        if chiffre_cible is not None:
+            if v1 == chiffre_cible or v2 == chiffre_cible:
+                base_fill = "#FFFACD"  # Jaune très pâle (partie liée)
+            else:
+                base_fill = "#B0B0B0"  # Gris foncé (dominos non concernés)
+
+        # 1. Dessiner la base du domino
         try:
-            dessin.rounded_rectangle([x1_pad, y1_pad, x2_pad, y2_pad], radius=rayon_arrondi, fill="white", outline="black", width=1)
+            dessin.rounded_rectangle([x1_pad, y1_pad, x2_pad, y2_pad], radius=rayon_arrondi, fill=base_fill, outline="black", width=1)
         except AttributeError:
-            dessin.rectangle([x1_pad, y1_pad, x2_pad, y2_pad], fill="white", outline="black", width=1)
-        
-        # La ligne de séparation au milieu fine (width=1)
-        if i1 == i2: # Domino horizontal
+            dessin.rectangle([x1_pad, y1_pad, x2_pad, y2_pad], fill=base_fill, outline="black", width=1)
+
+        # 2. Dessiner le surlignage vif (Scintillement) sur la case exacte
+        if chiffre_cible is not None and (v1 == chiffre_cible or v2 == chiffre_cible):
+            couleur_vif = "#FFD700"  # Jaune Or Vif
+            
+            if v1 == chiffre_cible:
+                if i1 == i2: # horizontal
+                    dessin.rectangle([x1_pad, y1_pad, x2, y2_pad], fill=couleur_vif)
+                else: # vertical
+                    dessin.rectangle([x1_pad, y1_pad, x2_pad, y2], fill=couleur_vif)
+            
+            if v2 == chiffre_cible:
+                if i1 == i2: # horizontal
+                    dessin.rectangle([x2, y1_pad, x2_pad, y2_pad], fill=couleur_vif)
+                else: # vertical
+                    dessin.rectangle([x1_pad, y2, x2_pad, y2_pad], fill=couleur_vif)
+
+            # Redessiner le contour par-dessus pour cacher les débordements carrés
+            try:
+                dessin.rounded_rectangle([x1_pad, y1_pad, x2_pad, y2_pad], radius=rayon_arrondi, outline="black", width=1)
+            except AttributeError:
+                dessin.rectangle([x1_pad, y1_pad, x2_pad, y2_pad], outline="black", width=1)
+
+        # 3. Ligne de séparation
+        if i1 == i2: 
             dessin.line([x2, y1_pad, x2, y2_pad], fill="black", width=1)
-        else: # Domino vertical
+        else: 
             dessin.line([x1_pad, y2, x2_pad, y2], fill="black", width=1)
 
-        # On dessine les points par-dessus
+        # 4. Dessiner les points
         dessiner_points(x1, y1, v1)
         dessiner_points(x2, y2, v2)
 

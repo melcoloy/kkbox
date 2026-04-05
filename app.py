@@ -298,10 +298,27 @@ with col2:
             else:
                 st.write("⚠️ *Le stock de dominos était peut-être trop limité pour cette image.*")
             
-            # 5. Dessin final de la mosaïque
+            # --- NOUVELLE FONCTIONNALITÉ : RECHERCHE VISUELLE ---
+            st.divider()
+            st.subheader("🔍 Analyse Visuelle de l'Inventaire")
+            st.write("Sélectionnez un chiffre pour mettre en évidence son emplacement sur la mosaïque :")
+            
+            valeur_max_jeu = 6 if type_jeu == "double_six" else 9
+            options_chiffres = ["Aucun"] + list(range(valeur_max_jeu + 1))
+            
+            chiffre_selectionne = st.radio(
+                "Mettre en évidence le chiffre :", 
+                options_chiffres, 
+                horizontal=True
+            )
+            
+            chiffre_cible = None if chiffre_selectionne == "Aucun" else int(chiffre_selectionne)
+
+            # 5. Dessin final de la mosaïque avec le filtre visuel
             st.subheader("🖼️ Votre Mosaïque")
             lignes, colonnes = matrice_reference.shape
-            image_mosaique = traitement_image.dessiner_mosaique(placements, lignes, colonnes)
+            
+            image_mosaique = traitement_image.dessiner_mosaique(placements, lignes, colonnes, chiffre_cible=chiffre_cible)
             
             st.image(image_mosaique, caption="Mosaïque générée avec succès !", use_container_width=True)
             st.balloons() 
