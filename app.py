@@ -179,23 +179,28 @@ def optimiser_placement_hongrois(cibles, emplacements, inventaire, st_progress_b
 st.title("🎲 Générateur de Mosaïque en Dominos")
 st.write("Projet P4 - Par Matteo Hanon Obsomer & Clément Leroy")
 
-# --- Barre latérale (Paramètres) ---
-st.sidebar.header("Paramètres")
-type_jeu = st.sidebar.radio("Type de jeu :", ("double_six", "double_neuf"), key="radio_type_jeu_main")
-nb_boites = st.sidebar.number_input("Nombre de boîtes", min_value=1, value=10, step=1)
-largeur_grille = st.sidebar.slider("Largeur (en nombre de dominos)", min_value=60, max_value=160, step=10, key="slider_largeur")
-
-choix_algo = st.sidebar.radio(
-    "Choix de l'algorithme :", 
-    ("Glouton (Rapide, par le centre)", "Hongrois (Lent, optimum mathématique)", "Méta-Heuristique (Aléatoire)","Hongrois (Matteo)"),key="radio_algo_main"
-)
-
-btn_generer = st.sidebar.button("Générer la mosaïque")
-
-# Nettoyage de la mémoire si on change d'image 
+# Fonction pour vider la mémoire de Streamlit (Force le recalcul de l'image)
 def clear_session():
     if 'placements' in st.session_state:
         del st.session_state['placements']
+
+# --- Barre latérale (Paramètres) ---
+st.sidebar.header("Paramètres")
+type_jeu = st.sidebar.radio("Type de jeu :", ("double_six", "double_neuf"), key="radio_type_jeu_main", on_change=clear_session)
+nb_boites = st.sidebar.number_input("Nombre de boîtes", min_value=1, value=10, step=1, on_change=clear_session)
+largeur_grille = st.sidebar.slider("Largeur (en nombre de dominos)", min_value=60, max_value=160, step=10, key="slider_largeur", on_change=clear_session)
+
+activer_contours = st.sidebar.checkbox("Activer la segmentation (Contours)", on_change=clear_session)
+activer_dithering = st.sidebar.checkbox("Activer le Dithering (Floyd-Steinberg)", value=True, on_change=clear_session)
+
+choix_algo = st.sidebar.radio(
+    "Choix de l'algorithme :", 
+    ("Glouton (Rapide, par le centre)", "Hongrois (Lent, optimum mathématique)", "Méta-Heuristique (Aléatoire)","Hongrois (Matteo)"),
+    key="radio_algo_main",
+    on_change=clear_session
+)
+
+btn_generer = st.sidebar.button("Générer la mosaïque")
 
 # --- Zone principale ---
 col1, col2 = st.columns(2)
@@ -240,9 +245,14 @@ with col2:
             inventaire = generer_inventaire_v2(nb_dominos, type_jeu, matrice)
             emplacements = generer_emplacements(largeur_grille, hauteur_grille)
             
-            # Prétraitement de l'image
-            image_prete = traitement_image.preparer_image(image_originale, total_dominos)
-            matrice_valeurs = traitement_image.image_vers_matrice(image_prete, type_jeu)
+            # Prétraitement de l'image (avec sécurité sur l'argument 'contours')
+            try:
+                image_prete = traitement_image.preparer_image(image_originale, total_dominos, activer_contours)
+            except TypeError:
+                image_prete = traitement_image.preparer_image(image_originale, total_dominos)
+
+            # --- CORRECTION FINALE DU DITHERING : On impose l'argument "appliquer_dithering" ---
+            matrice_valeurs = traitement_image.image_vers_matrice(image_prete, type_jeu, appliquer_dithering=activer_dithering)
             
             # Lancement de l'algorithme choisi
             heure_debut = time.time() 
@@ -262,7 +272,7 @@ with col2:
                 
             temps_execution = time.time() - heure_debut 
             
-            # Conversion V2 
+            # Conversion pour compatibilité universelle du dessin
             if choix_algo in ["Méta-Heuristique (Aléatoire)", "Hongrois (Matteo)"]:
                 placements = []
                 for idx, (val1, val2) in enumerate(placements_bruts):
@@ -273,7 +283,7 @@ with col2:
                         "valeurs": (val1, val2)
                     })
                     
-            # --- SAUVEGARDE EN MÉMOIRE POUR RÉSISTER AUX CLICS DES WIDGETS ---
+            # --- SAUVEGARDE EN MÉMOIRE POUR RÉSISTER AUX CLICS ---
             st.session_state['placements'] = placements
             st.session_state['matrice_reference'] = matrice_reference
             st.session_state['image_prete'] = image_prete
@@ -315,7 +325,7 @@ with col2:
             st.metric(label="⏱️ Temps d'exécution", value=f"{temps_execution:.3f} s")
         
         # ---------------------------------------------------------
-        # RECHERCHE VISUELLE SYNCHRONISÉE (CORRIGÉE)
+        # RECHERCHE VISUELLE SYNCHRONISÉE
         # ---------------------------------------------------------
         st.divider()
         st.subheader("🔍 Analyse Visuelle Interactive")
@@ -331,7 +341,7 @@ with col2:
         # 2. On cherche à quelle position se trouve le choix actuel pour l'afficher sur le bouton radio
         index_actuel = options_chiffres.index(st.session_state['chiffre_cible']) if st.session_state['chiffre_cible'] in options_chiffres else 0
             
-        # 3. Le sélecteur N'A PLUS de 'key'. On lui donne juste l'index à afficher.
+        # 3. Le sélecteur lit l'index depuis la mémoire
         chiffre_selectionne = st.radio(
             "Chiffre à analyser :", 
             options_chiffres, 
@@ -355,8 +365,12 @@ with col2:
         # On dessine l'image avec la surbrillance choisie
         image_mosaique = traitement_image.dessiner_mosaique(placements, lignes, colonnes, taille_case=taille_case, chiffre_cible=c_cible)
         
-        # On l'affiche de façon interactive
-        click_data = streamlit_image_coordinates(image_mosaique, key="mosaique_interactive", use_column_width=True)
+        # On l'affiche de façon interactive (use_column_width permet d'éviter l'image rognée)
+        click_data = streamlit_image_coordinates(
+            image_mosaique, 
+            key="mosaique_interactive",
+            use_column_width=True 
+        )
         
         # 5. Interception d'un clic de souris de l'utilisateur sur l'image
         if click_data is not None:
@@ -378,7 +392,7 @@ with col2:
                     # On vérifie qu'on ne clique pas sur un chiffre déjà sélectionné
                     if st.session_state['chiffre_cible'] != chiffre_clique:
                         st.session_state['chiffre_cible'] = chiffre_clique
-                        st.rerun() # Et on recharge la page (ce qui mettra à jour le bouton radio au passage !)
+                        st.rerun() # Et on recharge la page
 
         # INVENTAIRE
         st.divider()
@@ -428,15 +442,4 @@ with col2:
         <div style="text-align: left;">
             <button onclick="
                 var w = window.open('');
-                w.document.write('<html><head><title>Impression Mosaique</title></head><body style=\\'margin:0;display:flex;justify-content:center;align-items:center;height:100vh;\\'><img src=\\'data:image/png;base64,{b64_image}\\' style=\\'max-width:100%;max-height:100%;\\'></body></html>');
-                w.document.close();
-                w.focus();
-                setTimeout(function() {{ w.print(); w.close(); }}, 500);
-            " style="background-color: #ffffff; color: #31333F; padding: 10px 24px; border: 1px solid #dcdcdc; border-radius: 8px; cursor: pointer; font-size: 16px; font-family: sans-serif; transition: 0.3s;"
-            onmouseover="this.style.borderColor='#FF4B4B'; this.style.color='#FF4B4B';"
-            onmouseout="this.style.borderColor='#dcdcdc'; this.style.color='#31333F';">
-                🖨️ Lancer l'impression
-            </button>
-        </div>
-        """
-        components.html(html_bouton, height=60)
+                w.document.write('<html><head><title>Impression Mosaique</title></head><body style=\\'margin:0;display:flex;justify-content:center;align-items:center

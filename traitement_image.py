@@ -81,7 +81,7 @@ def image_vers_matrice(image_pil, type_jeu="double_six", appliquer_dithering=Tru
     return matrice_dominos
 
 def dessiner_mosaique(placements, lignes, colonnes, taille_case=40, chiffre_cible=None):
-    """Crée l'image finale avec option de mise en évidence d'un chiffre."""
+    """Crée l'image finale avec option de mise en évidence d'un chiffre (surbrillance)."""
     largeur_img = colonnes * taille_case
     hauteur_img = lignes * taille_case
     
@@ -92,6 +92,7 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40, chiffre_cibl
 
     def dessiner_points(x, y, valeur):
         marge = taille_case // 4
+        # Le choix de l'utilisateur : // 10 pour l'équilibre parfait
         r = taille_case // 10 
         cx, cy = x + taille_case//2, y + taille_case//2 
         
@@ -116,8 +117,10 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40, chiffre_cibl
 
         for p in pts:
             px, py = pos[p]
+            # Les points (pips) sont noirs
             dessin.ellipse([px-r, py-r, px+r, py+r], fill="black")
 
+    # Calcul de l'espacement et de l'arrondi
     padding = max(1, taille_case // 15) 
     rayon_arrondi = taille_case // 5    
 
@@ -132,6 +135,7 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40, chiffre_cibl
         x_min, y_min = min(x1, x2), min(y1, y2)
         x_max, y_max = max(x1, x2) + taille_case, max(y1, y2) + taille_case
 
+        # Coordonnées du domino AVEC l'espacement (padding)
         x1_pad = x_min + padding
         y1_pad = y_min + padding
         x2_pad = x_max - padding
