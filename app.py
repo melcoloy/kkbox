@@ -10,6 +10,17 @@ import pandas as pd
 import streamlit.components.v1 as components
 from scipy.optimize import linear_sum_assignment
 
+# --- Configuration obligatoire en premier ---
+st.set_page_config(page_title="Mosaïque de dominos", layout="wide")
+
+# --- Vérification de l'installation du module de clic ---
+try:
+    from streamlit_image_coordinates import streamlit_image_coordinates
+except ImportError:
+    st.error("⚠️ Action requise : La fonctionnalité de clic sur l'image nécessite une nouvelle bibliothèque.")
+    st.info("Veuillez ouvrir un terminal et taper la commande suivante :\n\n`pip install streamlit-image-coordinates`\n\nPuis relancez l'application (Ctrl+C puis `streamlit run app.py`).")
+    st.stop()
+
 # --- Imports des autres modules du projet ---
 import algorithme
 import hongrois_v1
@@ -165,7 +176,6 @@ def optimiser_placement_hongrois(cibles, emplacements, inventaire, st_progress_b
 # 2. INTERFACE STREAMLIT
 # =====================================================================
 
-st.set_page_config(page_title="Mosaïque de dominos", layout="wide")
 st.title("🎲 Générateur de Mosaïque en Dominos")
 st.write("Projet P4 - Par Matteo Hanon Obsomer & Clément Leroy")
 
@@ -182,7 +192,7 @@ choix_algo = st.sidebar.radio(
 
 btn_generer = st.sidebar.button("Générer la mosaïque")
 
-# Nettoyage de la mémoire si on change d'image (Optionnel mais propre)
+# Nettoyage de la mémoire si on change d'image 
 def clear_session():
     if 'placements' in st.session_state:
         del st.session_state['placements']
@@ -192,9 +202,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.header("Image originale")
-    
     choix_source = st.radio("Source de l'image :", ["📁 Importer un fichier", "📸 Prendre une photo"], key="radio_source_main", on_change=clear_session)
-    
     fichier_upload = None
     
     if choix_source == "📁 Importer un fichier":
@@ -306,30 +314,64 @@ with col2:
         with col_met2:
             st.metric(label="⏱️ Temps d'exécution", value=f"{temps_execution:.3f} s")
         
-        # RECHERCHE VISUELLE (Cette partie ne fait plus planter l'app !)
+        # ---------------------------------------------------------
+        # RECHERCHE VISUELLE SYNCHRONISÉE (CLIC + BOUTONS)
+        # ---------------------------------------------------------
         st.divider()
-        st.subheader("🔍 Analyse Visuelle de l'Inventaire")
-        st.write("Sélectionnez un chiffre pour mettre en évidence son emplacement sur la mosaïque :")
+        st.subheader("🔍 Analyse Visuelle Interactive")
+        st.write("Sélectionnez un chiffre avec les boutons **OU cliquez directement sur un domino** de l'image pour le mettre en évidence :")
         
         valeur_max_jeu = 6 if type_jeu == "double_six" else 9
         options_chiffres = ["Aucun"] + list(range(valeur_max_jeu + 1))
         
-        chiffre_selectionne = st.radio(
-            "Mettre en évidence le chiffre :", 
+        # Création de la variable d'état si elle n'existe pas
+        if 'chiffre_cible' not in st.session_state:
+            st.session_state.chiffre_cible = "Aucun"
+            
+        # Le sélecteur est lié directement à la mémoire de Streamlit
+        st.radio(
+            "Chiffre à analyser :", 
             options_chiffres, 
-            horizontal=True
+            horizontal=True,
+            key="chiffre_cible" # Liaison magique avec st.session_state.chiffre_cible
         )
         
-        chiffre_cible = None if chiffre_selectionne == "Aucun" else int(chiffre_selectionne)
+        # On détermine l'entier exact à envoyer à la fonction de dessin
+        c_cible = None if st.session_state.chiffre_cible == "Aucun" else int(st.session_state.chiffre_cible)
 
         # DESSIN INTERACTIF
         st.subheader("🖼️ Votre Mosaïque")
         lignes, colonnes = matrice_reference.shape
+        taille_case = 40 # Standard de votre module
         
-        # Dessine l'image avec ou sans mise en évidence (très rapide, donc on peut le faire à chaque clic)
-        image_mosaique = traitement_image.dessiner_mosaique(placements, lignes, colonnes, chiffre_cible=chiffre_cible)
+        # 1. On dessine l'image avec la surbrillance choisie
+        image_mosaique = traitement_image.dessiner_mosaique(placements, lignes, colonnes, taille_case=taille_case, chiffre_cible=c_cible)
         
-        st.image(image_mosaique, caption="Mosaïque générée avec succès !", use_container_width=True)
+        # 2. On l'affiche de façon interactive (remplace st.image)
+        click_data = streamlit_image_coordinates(image_mosaique, key="mosaique_interactive")
+        
+        # 3. Interception d'un clic de souris de l'utilisateur
+        if click_data is not None:
+            last_click = st.session_state.get('last_click', None)
+            
+            # S'il s'agit d'un nouveau clic
+            if click_data != last_click:
+                st.session_state.last_click = click_data # On le mémorise
+                
+                # Conversion du pixel cliqué en coordonnées de grille
+                x_pixel, y_pixel = click_data['x'], click_data['y']
+                col_grille = x_pixel // taille_case
+                row_grille = y_pixel // taille_case
+                
+                # Si le clic est bien à l'intérieur de la zone de dominos
+                if row_grille < lignes and col_grille < colonnes:
+                    chiffre_clique = int(matrice_reference[row_grille, col_grille])
+                    
+                    # On met à jour la mémoire (ce qui mettra aussi à jour le bouton radio en haut !)
+                    st.session_state.chiffre_cible = chiffre_clique
+                    
+                    # On relance instantanément la page pour appliquer la couleur
+                    st.rerun()
 
         # INVENTAIRE
         st.divider()
