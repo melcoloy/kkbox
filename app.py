@@ -41,12 +41,12 @@ if not _CLIC_DISPONIBLE:
 
 # ── Barre latérale ────────────────────────────────────────────────────
 st.sidebar.header("Paramètres")
-type_jeu      = st.sidebar.radio("Type de jeu :", ("double_six", "double_neuf"), key="type_jeu")
+type_jeu      = st.sidebar.radio("Type de jeu :", ("double_six", "double_neuf"), key="widget_type_jeu")
 nb_boites     = st.sidebar.number_input("Nombre de boîtes", min_value=1, value=10, step=1)
 largeur_grille = st.sidebar.slider("Largeur (dominos)", min_value=60, max_value=160, step=10)
 activer_contours  = st.sidebar.checkbox("Segmentation des contours")
 activer_dithering = st.sidebar.checkbox("Dithering Floyd-Steinberg", value=True)
-choix_algo    = st.sidebar.radio("Algorithme :", list(ALGOS.keys()), key="algo")
+choix_algo    = st.sidebar.radio("Algorithme :", list(ALGOS.keys()), key="widget_algo")
 btn_generer   = st.sidebar.button("Générer la mosaïque")
 
 # ── Colonnes principales ──────────────────────────────────────────────
@@ -54,7 +54,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.header("Image originale")
-    source = st.radio("Source :", ["📁 Importer un fichier", "📸 Webcam"], key="source")
+    source = st.radio("Source :", ["📁 Importer un fichier", "📸 Webcam"], key="widget_source")
     fichier = (
         st.file_uploader("Image (JPG, PNG)", type=["jpg", "jpeg", "png"])
         if source == "📁 Importer un fichier"

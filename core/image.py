@@ -180,32 +180,58 @@ def dessiner_mosaique(
             px, py = pos[p]
             dessin.ellipse([px - r, py - r, px + r, py + r], fill=couleur)
 
+    # Normalisation : s'assurer que chiffre_cible est un int Python pur
+    cible = int(chiffre_cible) if chiffre_cible is not None else None
+
+    def fond_case(valeur) -> tuple:
+        """Jaune vif si la case correspond exactement au chiffre cible, blanc sinon."""
+        if cible is not None and int(valeur) == cible:
+            return (255, 215, 0)   # jaune vif
+        return (255, 255, 255)     # blanc normal
+
+    def pip_case(valeur):
+        """Pips rouges sur la case illuminée, noirs sinon."""
+        if cible is not None and int(valeur) == cible:
+            return (180, 0, 0)
+        return "black"
+
     for p in placements:
         i1, j1 = p["case1"]
         i2, j2 = p["case2"]
-        v1, v2 = p["valeurs"]
-
-        en_surbrillance = chiffre_cible is not None and chiffre_cible in (v1, v2)
-        couleur_fond = (255, 255, 180) if en_surbrillance else "white"
-        couleur_pip = (180, 0, 0) if en_surbrillance else "black"
+        v1, v2 = int(p["valeurs"][0]), int(p["valeurs"][1])
 
         x1, y1 = j1 * taille_case, i1 * taille_case
         x2, y2 = j2 * taille_case, i2 * taille_case
         x_min, y_min = min(x1, x2), min(y1, y2)
         x_max, y_max = max(x1, x2) + taille_case, max(y1, y2) + taille_case
 
+        # Fond global blanc (bordure + coins arrondis)
         rect = [x_min + padding, y_min + padding, x_max - padding, y_max - padding]
         try:
-            dessin.rounded_rectangle(rect, radius=rayon, fill=couleur_fond, outline="black", width=1)
+            dessin.rounded_rectangle(rect, radius=rayon, fill=(255, 255, 255), outline="black", width=1)
         except AttributeError:
-            dessin.rectangle(rect, fill=couleur_fond, outline="black", width=1)
+            dessin.rectangle(rect, fill=(255, 255, 255), outline="black", width=1)
 
+        # Coordonnées exactes de chaque demi-case (inset de 1px pour ne pas écraser la bordure)
+        if i1 == i2:  # domino horizontal — case1 à gauche, case2 à droite
+            rect1 = [x_min + padding + 1, y_min + padding + 1, x2 - 1,              y_max - padding - 1]
+            rect2 = [x2 + 1,              y_min + padding + 1, x_max - padding - 1, y_max - padding - 1]
+        else:          # domino vertical — case1 en haut, case2 en bas
+            rect1 = [x_min + padding + 1, y_min + padding + 1, x_max - padding - 1, y2 - 1]
+            rect2 = [x_min + padding + 1, y2 + 1,              x_max - padding - 1, y_max - padding - 1]
+
+        # Peindre chaque demi-case avec sa couleur propre (toujours, sans condition)
+        dessin.rectangle(rect1, fill=fond_case(v1))
+        dessin.rectangle(rect2, fill=fond_case(v2))
+
+        # Ligne de séparation
         if i1 == i2:
             dessin.line([x2, y_min + padding, x2, y_max - padding], fill="black", width=1)
         else:
             dessin.line([x_min + padding, y2, x_max - padding, y2], fill="black", width=1)
 
-        dessiner_pips(x1, y1, v1, couleur_pip)
-        dessiner_pips(x2, y2, v2, couleur_pip)
+        # Pips par-dessus
+        dessiner_pips(x1, y1, v1, pip_case(v1))
+        dessiner_pips(x2, y2, v2, pip_case(v2))
 
     return image_finale
