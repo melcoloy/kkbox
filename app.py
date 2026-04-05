@@ -356,7 +356,7 @@ with col2:
         image_mosaique = traitement_image.dessiner_mosaique(placements, lignes, colonnes, taille_case=taille_case, chiffre_cible=c_cible)
         
         # On l'affiche de façon interactive
-        click_data = streamlit_image_coordinates(image_mosaique, key="mosaique_interactive")
+        click_data = streamlit_image_coordinates(image_mosaique, key="mosaique_interactive", use_column_width=True)
         
         # 5. Interception d'un clic de souris de l'utilisateur sur l'image
         if click_data is not None:
