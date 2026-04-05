@@ -16,10 +16,9 @@ st.set_page_config(page_title="Mosaïque de dominos", layout="wide")
 # --- Vérification de l'installation du module de clic ---
 try:
     from streamlit_image_coordinates import streamlit_image_coordinates
+    _CLIC_DISPONIBLE = True
 except ImportError:
-    st.error("⚠️ Action requise : La fonctionnalité de clic sur l'image nécessite une nouvelle bibliothèque.")
-    st.info("Veuillez ouvrir un terminal et taper la commande suivante :\n\n`pip install streamlit-image-coordinates`\n\nPuis relancez l'application (Ctrl+C puis `streamlit run app.py`).")
-    st.stop()
+    _CLIC_DISPONIBLE = False
 
 # --- Imports des autres modules du projet ---
 import algorithme

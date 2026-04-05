@@ -1,66 +1,131 @@
 from PIL import Image, ImageDraw, ImageOps, ImageFilter
-import math
 import numpy as np
+
+
+# --- Taille minimale raisonnable pour éviter les images dégénérées ---
+_DIMENSION_MIN = 2
+
 
 def preparer_image(image_originale, total_dominos, renforcer_contours=False):
     """
-    Convertit l'image en noir et blanc (niveau de gris) et la redimensionne 
-    en utilisant les diviseurs parfaits pour vider 100% du stock.
+    Convertit l'image en noir et blanc et la redimensionne pour utiliser
+    exactement total_dominos dominos (2 pixels par domino).
+
+    Args:
+        image_originale: objet PIL.Image (n'importe quel mode).
+        total_dominos: nombre entier de dominos >= 1.
+        renforcer_contours: bool, active le filtre EDGE_ENHANCE_MORE.
+
+    Returns:
+        PIL.Image en mode "L" (niveaux de gris), redimensionnée.
+
+    Raises:
+        ValueError: si l'image est invalide ou total_dominos < 1.
+        TypeError: si image_originale n'est pas un objet PIL.Image.
     """
-    image_nb = image_originale.convert("L") 
+    if not isinstance(image_originale, Image.Image):
+        raise TypeError(
+            f"image_originale doit être un objet PIL.Image, reçu : {type(image_originale).__name__}"
+        )
+    if not isinstance(total_dominos, int) or total_dominos < 1:
+        raise ValueError(
+            f"total_dominos doit être un entier >= 1, reçu : {total_dominos!r}"
+        )
+
+    image_nb = image_originale.convert("L")
     image_nb = ImageOps.autocontrast(image_nb)
-    
-    # Segmentation optionnelle demandée par l'utilisateur
+
     if renforcer_contours:
         image_nb = image_nb.filter(ImageFilter.EDGE_ENHANCE_MORE)
-    
-    surface_cible = total_dominos * 2  
-    
+
+    surface_cible = total_dominos * 2
     largeur_orig, hauteur_orig = image_nb.size
+
+    # Sécurité : image source dégénérée
+    if largeur_orig < _DIMENSION_MIN or hauteur_orig < _DIMENSION_MIN:
+        raise ValueError(
+            f"Image trop petite ({largeur_orig}×{hauteur_orig} px). "
+            f"Dimensions minimales : {_DIMENSION_MIN}×{_DIMENSION_MIN}."
+        )
+
     ratio_cible = largeur_orig / hauteur_orig
-    
     nouvelle_largeur = surface_cible
     nouvelle_hauteur = 1
-    meilleure_diff = float('inf')
-    
+    meilleure_diff = float("inf")
+
     for h in range(1, surface_cible + 1):
-        if surface_cible % h == 0:  
+        if surface_cible % h == 0:
             l = surface_cible // h
+            # On écarte les dimensions dégénérées (trop étroites ou trop hautes)
+            if l < _DIMENSION_MIN or h < _DIMENSION_MIN:
+                continue
             ratio_actuel = l / h
             diff = abs(ratio_actuel - ratio_cible)
-            
             if diff < meilleure_diff:
                 meilleure_diff = diff
                 nouvelle_largeur = l
                 nouvelle_hauteur = h
-                
+
+    # Sécurité : si aucune dimension valide n'a été trouvée (total_dominos très petit)
+    if nouvelle_hauteur < _DIMENSION_MIN or nouvelle_largeur < _DIMENSION_MIN:
+        raise ValueError(
+            f"Impossible de trouver des dimensions valides pour {total_dominos} dominos. "
+            f"Augmentez le nombre de boîtes."
+        )
+
     image_redimensionnee = image_nb.resize((nouvelle_largeur, nouvelle_hauteur))
     return image_redimensionnee
 
+
 def image_vers_matrice(image_pil, type_jeu="double_six", appliquer_dithering=True):
-    """Convertit l'image en une matrice de dominos, avec propagation d'erreur (Floyd-Steinberg)."""
-    valeur_max = 6 if type_jeu == "double_six" else 9
-    
-    # On travaille avec des nombres à virgule (float) pour garder l'erreur
+    """
+    Convertit une image PIL en niveaux de gris en matrice de valeurs de dominos,
+    avec propagation d'erreur optionnelle (Floyd-Steinberg).
+
+    Args:
+        image_pil: PIL.Image en mode "L" (niveaux de gris).
+        type_jeu: "double_six" ou "double_neuf".
+        appliquer_dithering: bool.
+
+    Returns:
+        np.ndarray 2D d'entiers dans [0, valeur_max].
+
+    Raises:
+        ValueError: si type_jeu est invalide ou image non en niveaux de gris.
+        TypeError: si image_pil n'est pas un objet PIL.Image.
+    """
+    if not isinstance(image_pil, Image.Image):
+        raise TypeError(
+            f"image_pil doit être un objet PIL.Image, reçu : {type(image_pil).__name__}"
+        )
+
+    # Conversion silencieuse si l'image n'est pas déjà en niveaux de gris
+    if image_pil.mode != "L":
+        image_pil = image_pil.convert("L")
+
+    types_valides = {"double_six": 6, "double_neuf": 9}
+    if type_jeu not in types_valides:
+        raise ValueError(
+            f"type_jeu invalide : '{type_jeu}'. "
+            f"Valeurs acceptées : {list(types_valides.keys())}"
+        )
+
+    valeur_max = types_valides[type_jeu]
     matrice = np.array(image_pil, dtype=float)
     matrice = (matrice / 255.0) * valeur_max
-    
+
     lignes, colonnes = matrice.shape
-    
+
     if appliquer_dithering:
-        # Algorithme de Floyd-Steinberg
         for i in range(lignes):
             for j in range(colonnes):
                 ancienne_valeur = matrice[i, j]
-                nouvelle_valeur = np.round(ancienne_valeur)
-                # On s'assure de ne pas dépasser les limites des dominos
-                nouvelle_valeur = min(valeur_max, max(0, nouvelle_valeur))
+                nouvelle_valeur = float(np.round(ancienne_valeur))
+                nouvelle_valeur = min(valeur_max, max(0.0, nouvelle_valeur))
                 matrice[i, j] = nouvelle_valeur
-                
-                # Calcul de l'erreur d'arrondi
+
                 erreur = ancienne_valeur - nouvelle_valeur
-                
-                # On propage l'erreur aux voisins (selon les fractions de Floyd-Steinberg)
+
                 if j + 1 < colonnes:
                     matrice[i, j + 1] += erreur * (7 / 16)
                 if i + 1 < lignes:
@@ -71,63 +136,97 @@ def image_vers_matrice(image_pil, type_jeu="double_six", appliquer_dithering=Tru
                         matrice[i + 1, j + 1] += erreur * (1 / 16)
     else:
         matrice = np.round(matrice)
-        
+
     matrice_dominos = matrice.astype(int)
     matrice_dominos = np.clip(matrice_dominos, 0, valeur_max)
-    
-    # CORRECTION DE L'EFFET NÉGATIF (Dominos blancs = fond blanc)
+
+    # Inversion : dominos blancs = fond blanc
     matrice_dominos = valeur_max - matrice_dominos
-    
+
     return matrice_dominos
 
+
 def dessiner_mosaique(placements, lignes, colonnes, taille_case=40, chiffre_cible=None):
-    """Crée l'image finale avec option de mise en évidence d'un chiffre (surbrillance)."""
+    """
+    Crée l'image finale avec des dominos dessinés sur fond sombre.
+
+    Args:
+        placements: liste de dicts {"case1", "case2", "valeurs"}.
+        lignes: nombre de lignes de la grille.
+        colonnes: nombre de colonnes de la grille.
+        taille_case: taille en pixels d'une case (défaut 40).
+        chiffre_cible: int ou None — si fourni, met en surbrillance
+                       les dominos contenant ce chiffre.
+
+    Returns:
+        PIL.Image RGB de la mosaïque.
+
+    Raises:
+        ValueError: si placements est vide ou dimensions invalides.
+    """
+    if not placements:
+        raise ValueError("La liste de placements est vide.")
+    if lignes < 1 or colonnes < 1:
+        raise ValueError(f"Dimensions invalides : {lignes}×{colonnes}.")
+    if taille_case < 10:
+        raise ValueError(f"taille_case trop petite : {taille_case} (minimum 10).")
+
     largeur_img = colonnes * taille_case
     hauteur_img = lignes * taille_case
-    
-    # Fond global de l'image (Gris très foncé pour faire ressortir les dominos blancs)
+
     couleur_fond = (40, 40, 40)
     image_finale = Image.new("RGB", (largeur_img, hauteur_img), couleur_fond)
     dessin = ImageDraw.Draw(image_finale)
 
-    def dessiner_points(x, y, valeur):
+    def dessiner_points(x, y, valeur, couleur_pip="black"):
         marge = taille_case // 4
-        # Le choix de l'utilisateur : // 10 pour l'équilibre parfait
-        r = taille_case // 10 
-        cx, cy = x + taille_case//2, y + taille_case//2 
-        
-        pos = {
-            'c': (cx, cy),
-            'hg': (x + marge, y + marge), 'hd': (x + taille_case - marge, y + marge),
-            'bg': (x + marge, y + taille_case - marge), 'bd': (x + taille_case - marge, y + taille_case - marge),
-            'mg': (x + marge, cy), 'md': (x + taille_case - marge, cy),
-            'hm': (cx, y + marge), 'bm': (cx, y + taille_case - marge)
-        }
-        
-        pts = []
-        if valeur == 1: pts = ['c']
-        elif valeur == 2: pts = ['hg', 'bd']
-        elif valeur == 3: pts = ['hg', 'c', 'bd']
-        elif valeur == 4: pts = ['hg', 'hd', 'bg', 'bd']
-        elif valeur == 5: pts = ['hg', 'hd', 'c', 'bg', 'bd']
-        elif valeur == 6: pts = ['hg', 'hd', 'mg', 'md', 'bg', 'bd']
-        elif valeur == 7: pts = ['hg', 'hd', 'mg', 'md', 'bg', 'bd', 'c']
-        elif valeur == 8: pts = ['hg', 'hd', 'mg', 'md', 'bg', 'bd', 'hm', 'bm']
-        elif valeur == 9: pts = ['hg', 'hd', 'mg', 'md', 'bg', 'bd', 'hm', 'bm', 'c']
+        r = taille_case // 10
+        cx, cy = x + taille_case // 2, y + taille_case // 2
 
+        pos = {
+            "c":  (cx, cy),
+            "hg": (x + marge,              y + marge),
+            "hd": (x + taille_case - marge, y + marge),
+            "bg": (x + marge,              y + taille_case - marge),
+            "bd": (x + taille_case - marge, y + taille_case - marge),
+            "mg": (x + marge,              cy),
+            "md": (x + taille_case - marge, cy),
+            "hm": (cx,                      y + marge),
+            "bm": (cx,                      y + taille_case - marge),
+        }
+
+        disposition = {
+            0: [],
+            1: ["c"],
+            2: ["hg", "bd"],
+            3: ["hg", "c", "bd"],
+            4: ["hg", "hd", "bg", "bd"],
+            5: ["hg", "hd", "c", "bg", "bd"],
+            6: ["hg", "hd", "mg", "md", "bg", "bd"],
+            7: ["hg", "hd", "mg", "md", "bg", "bd", "c"],
+            8: ["hg", "hd", "mg", "md", "bg", "bd", "hm", "bm"],
+            9: ["hg", "hd", "mg", "md", "bg", "bd", "hm", "bm", "c"],
+        }
+
+        pts = disposition.get(valeur, [])
         for p in pts:
             px, py = pos[p]
-            # Les points (pips) sont noirs
-            dessin.ellipse([px-r, py-r, px+r, py+r], fill="black")
+            dessin.ellipse([px - r, py - r, px + r, py + r], fill=couleur_pip)
 
-    # Calcul de l'espacement et de l'arrondi
-    padding = max(1, taille_case // 15) 
-    rayon_arrondi = taille_case // 5    
+    padding = max(1, taille_case // 15)
+    rayon_arrondi = taille_case // 5
 
     for p in placements:
         i1, j1 = p["case1"]
         i2, j2 = p["case2"]
         v1, v2 = p["valeurs"]
+
+        # Surbrillance si le chiffre cible est présent dans ce domino
+        en_surbrillance = (
+            chiffre_cible is not None and chiffre_cible in (v1, v2)
+        )
+        couleur_domino = (255, 255, 180) if en_surbrillance else "white"
+        couleur_pip = (180, 0, 0) if en_surbrillance else "black"
 
         x1, y1 = j1 * taille_case, i1 * taille_case
         x2, y2 = j2 * taille_case, i2 * taille_case
@@ -135,56 +234,34 @@ def dessiner_mosaique(placements, lignes, colonnes, taille_case=40, chiffre_cibl
         x_min, y_min = min(x1, x2), min(y1, y2)
         x_max, y_max = max(x1, x2) + taille_case, max(y1, y2) + taille_case
 
-        # Coordonnées du domino AVEC l'espacement (padding)
         x1_pad = x_min + padding
         y1_pad = y_min + padding
         x2_pad = x_max - padding
         y2_pad = y_max - padding
 
-        # --- LOGIQUE DE MISE EN ÉVIDENCE (Couleurs) ---
-        base_fill = "white"
-        if chiffre_cible is not None:
-            if v1 == chiffre_cible or v2 == chiffre_cible:
-                base_fill = "#FFFACD"  # Jaune très pâle (partie liée)
-            else:
-                base_fill = "#B0B0B0"  # Gris foncé (dominos non concernés)
-
-        # 1. Dessiner la base du domino
         try:
-            dessin.rounded_rectangle([x1_pad, y1_pad, x2_pad, y2_pad], radius=rayon_arrondi, fill=base_fill, outline="black", width=1)
+            dessin.rounded_rectangle(
+                [x1_pad, y1_pad, x2_pad, y2_pad],
+                radius=rayon_arrondi,
+                fill=couleur_domino,
+                outline="black",
+                width=1,
+            )
         except AttributeError:
-            dessin.rectangle([x1_pad, y1_pad, x2_pad, y2_pad], fill=base_fill, outline="black", width=1)
+            # Pillow < 8.2 : pas de rounded_rectangle
+            dessin.rectangle(
+                [x1_pad, y1_pad, x2_pad, y2_pad],
+                fill=couleur_domino,
+                outline="black",
+                width=1,
+            )
 
-        # 2. Dessiner le surlignage vif (Scintillement) sur la case exacte
-        if chiffre_cible is not None and (v1 == chiffre_cible or v2 == chiffre_cible):
-            couleur_vif = "#FFD700"  # Jaune Or Vif
-            
-            if v1 == chiffre_cible:
-                if i1 == i2: # horizontal
-                    dessin.rectangle([x1_pad, y1_pad, x2, y2_pad], fill=couleur_vif)
-                else: # vertical
-                    dessin.rectangle([x1_pad, y1_pad, x2_pad, y2], fill=couleur_vif)
-            
-            if v2 == chiffre_cible:
-                if i1 == i2: # horizontal
-                    dessin.rectangle([x2, y1_pad, x2_pad, y2_pad], fill=couleur_vif)
-                else: # vertical
-                    dessin.rectangle([x1_pad, y2, x2_pad, y2_pad], fill=couleur_vif)
-
-            # Redessiner le contour par-dessus pour cacher les débordements carrés
-            try:
-                dessin.rounded_rectangle([x1_pad, y1_pad, x2_pad, y2_pad], radius=rayon_arrondi, outline="black", width=1)
-            except AttributeError:
-                dessin.rectangle([x1_pad, y1_pad, x2_pad, y2_pad], outline="black", width=1)
-
-        # 3. Ligne de séparation
-        if i1 == i2: 
+        if i1 == i2:  # Domino horizontal
             dessin.line([x2, y1_pad, x2, y2_pad], fill="black", width=1)
-        else: 
+        else:  # Domino vertical
             dessin.line([x1_pad, y2, x2_pad, y2], fill="black", width=1)
 
-        # 4. Dessiner les points
-        dessiner_points(x1, y1, v1)
-        dessiner_points(x2, y2, v2)
+        dessiner_points(x1, y1, v1, couleur_pip)
+        dessiner_points(x2, y2, v2, couleur_pip)
 
     return image_finale
