@@ -442,4 +442,15 @@ with col2:
         <div style="text-align: left;">
             <button onclick="
                 var w = window.open('');
-                w.document.write('<html><head><title>Impression Mosaique</title></head><body style=\\'margin:0;display:flex;justify-content:center;align-items:center
+                w.document.write('<html><head><title>Impression Mosaique</title></head><body style=\\'margin:0;display:flex;justify-content:center;align-items:center;height:100vh;\\'><img src=\\'data:image/png;base64,{b64_image}\\' style=\\'max-width:100%;max-height:100%;\\'></body></html>');
+                w.document.close();
+                w.focus();
+                setTimeout(function() {{ w.print(); w.close(); }}, 500);
+            " style="background-color: #ffffff; color: #31333F; padding: 10px 24px; border: 1px solid #dcdcdc; border-radius: 8px; cursor: pointer; font-size: 16px; font-family: sans-serif; transition: 0.3s;"
+            onmouseover="this.style.borderColor='#FF4B4B'; this.style.color='#FF4B4B';"
+            onmouseout="this.style.borderColor='#dcdcdc'; this.style.color='#31333F';">
+                🖨️ Lancer l'impression
+            </button>
+        </div>
+        """
+        components.html(html_bouton, height=60)
