@@ -183,11 +183,18 @@ def dessiner_mosaique(
     # Normalisation : s'assurer que chiffre_cible est un int Python pur
     cible = int(chiffre_cible) if chiffre_cible is not None else None
 
-    def fond_case(valeur) -> tuple:
-        """Jaune vif si la case correspond exactement au chiffre cible, blanc sinon."""
-        if cible is not None and int(valeur) == cible:
-            return (255, 215, 0)   # jaune vif
-        return (255, 255, 255)     # blanc normal
+    def fond_case(valeur_actuelle, valeur_liee) -> tuple:
+        """
+        Jaune vif si la case correspond exactement au chiffre cible.
+        Jaune plus clair si la case est liée au chiffre cible.
+        Blanc sinon.
+        """
+        if cible is not None:
+            if int(valeur_actuelle) == cible:
+                return (255, 215, 0)     # Jaune vif (intense) pour le chiffre visé
+            elif int(valeur_liee) == cible:
+                return (255, 215, 0)   # Jaune pâle (moins intense) pour la case liée
+        return (255, 255, 255)           # Blanc normal
 
     def pip_case(valeur):
         """Pips rouges sur la case illuminée, noirs sinon."""
@@ -221,8 +228,8 @@ def dessiner_mosaique(
             rect2 = [x_min + padding + 1, y2 + 1,              x_max - padding - 1, y_max - padding - 1]
 
         # Peindre chaque demi-case avec sa couleur propre (toujours, sans condition)
-        dessin.rectangle(rect1, fill=fond_case(v1))
-        dessin.rectangle(rect2, fill=fond_case(v2))
+        dessin.rectangle(rect1, fill=fond_case(v1, v2))
+        dessin.rectangle(rect2, fill=fond_case(v2, v1))
 
         # Ligne de séparation
         if i1 == i2:
