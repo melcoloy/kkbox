@@ -191,9 +191,9 @@ def dessiner_mosaique(
         """
         if cible is not None:
             if int(valeur_actuelle) == cible:
-                return (255, 215, 0)     # Jaune vif (intense) pour le chiffre visé
+                return (0, 0, 139)     # bleu foncé
             elif int(valeur_liee) == cible:
-                return (255, 215, 0)   # Jaune pâle (moins intense) pour la case liée
+                return (135, 206, 235)   # bleu clair
         return (255, 255, 255)           # Blanc normal
 
     def pip_case(valeur):
