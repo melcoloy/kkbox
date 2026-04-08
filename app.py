@@ -43,7 +43,7 @@ if not _CLIC_DISPONIBLE:
 st.sidebar.header("Paramètres")
 type_jeu      = st.sidebar.radio("Type de jeu :", ("double_six", "double_neuf"), key="widget_type_jeu")
 nb_boites     = st.sidebar.number_input("Nombre de boîtes", min_value=1, value=10, step=1)
-largeur_grille = st.sidebar.slider("Largeur (dominos)", min_value=60, max_value=160, step=10)
+# largeur_grille = st.sidebar.slider("Largeur (dominos)", min_value=60, max_value=160, step=10)
 activer_contours  = st.sidebar.checkbox("Segmentation des contours")
 activer_dithering = st.sidebar.checkbox("Dithering Floyd-Steinberg", value=True)
 choix_algo    = st.sidebar.radio("Algorithme :", list(ALGOS.keys()), key="widget_algo")
