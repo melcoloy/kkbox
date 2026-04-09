@@ -8,7 +8,7 @@ import time
 
 import streamlit as st
 import streamlit.components.v1 as components
-from PIL import Image
+from PIL import Image, ImageOps
 
 from core.inventaire import generer_stock, completer_inventaire, valeur_max
 from core.image import preparer_image, image_vers_matrice, dessiner_mosaique
@@ -42,6 +42,8 @@ if not _CLIC_DISPONIBLE:
 # ── Barre latérale ────────────────────────────────────────────────────
 st.sidebar.header("Paramètres")
 type_jeu      = st.sidebar.radio("Type de jeu :", ("double_six", "double_neuf"), key="widget_type_jeu")
+style_dominos = st.sidebar.radio("Style des dominos :", ("⚪ Blancs", "⚫ Noirs"))
+style_str = "blancs" if "Blancs" in style_dominos else "noirs"
 nb_boites     = st.sidebar.number_input("Nombre de boîtes", min_value=1, value=10, step=1)
 # largeur_grille = st.sidebar.slider("Largeur (dominos)", min_value=60, max_value=160, step=10)
 activer_contours  = st.sidebar.checkbox("Segmentation des contours")
@@ -79,6 +81,9 @@ with col2:
 
                 # Prétraitement image
                 image_prete    = preparer_image(image_originale, len(stock), activer_contours)
+                # --- Inversion pour les dominos noirs ---
+                if style_str == "noirs":
+                    image_prete = ImageOps.invert(image_prete.convert("L"))
                 matrice_valeurs = image_vers_matrice(image_prete, type_jeu, activer_dithering)
 
                 # Inventaire adapté à la taille de la grille
@@ -124,6 +129,7 @@ with col2:
                     "temps":             temps,
                     "type_jeu":          type_jeu,
                     "vmax":              vmax,
+                    "style_calcule":     style_str,
                 })
 
         except ValueError as e:
@@ -179,7 +185,11 @@ with col2:
         c_cible = None if st.session_state["chiffre_cible"] == "Aucun" else int(st.session_state["chiffre_cible"])
         taille_case = 40
         lignes_r, colonnes_r = matrice_ref.shape
-        image_mosaique = dessiner_mosaique(placements, lignes_r, colonnes_r, taille_case, c_cible)
+
+        # Récupérer le style avec lequel la matrice a été calculée
+        style_utilise = st.session_state.get("style_calcule", "blancs")
+
+        image_mosaique = dessiner_mosaique(placements, lignes_r, colonnes_r, taille_case, c_cible, style=style_utilise)
 
         st.subheader("🖼️ Votre Mosaïque")
         click_data = None
